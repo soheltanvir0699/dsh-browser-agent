@@ -1,0 +1,61 @@
+name: 🐛 Bug report
+description: Something in Scout didn't work as expected
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! Please fill in as much as you can — the step log from the UI is especially helpful.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What went wrong, and what did you expect instead?
+      placeholder: Scout did X, but I expected Y.
+    validations:
+      required: true
+  - type: input
+    id: task
+    attributes:
+      label: The task you gave Scout
+      placeholder: 'e.g. "Open github.com/trending and list the top 3 repos"'
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Step log / trace
+      description: Paste the step-by-step log from the UI if you have it.
+      render: text
+  - type: dropdown
+    id: provider
+    attributes:
+      label: LLM provider
+      options:
+        - Groq
+        - Google Gemini
+        - DeepSeek
+        - OpenAI
+        - Ollama (local)
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      placeholder: openai/gpt-oss-20b
+  - type: input
+    id: os
+    attributes:
+      label: OS + Node version
+      placeholder: macOS 15 / Node 20
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and didn't find a duplicate.
+          required: true
+        - label: I did NOT include my API key, cookies, or any secret.
+          required: true

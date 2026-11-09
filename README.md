@@ -10,6 +10,12 @@
   <img alt="llm" src="https://img.shields.io/badge/LLM-Groq%20%7C%20Gemini%20%7C%20Ollama-5b5bd6">
 </p>
 
+<p align="center">
+  <img src="docs/screenshot.png" alt="Scout AI browser agent — chatbot UI showing a completed task with a formatted result" width="760">
+</p>
+
+> _Tip: replace `docs/screenshot.png` with a short screen-recording GIF of a live task for an even stronger landing page._
+
 > **Privacy by design:** the agent operates *inside* a real, logged-in browser session the same way you do. It **never extracts or decrypts** your cookies or saved passwords. You log into sites yourself (once) and the session persists — there is no credential-harvesting code in this repo, and PRs adding any will not be accepted.
 
 ---

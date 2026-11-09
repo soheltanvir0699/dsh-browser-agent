@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Read the docs first
+    url: https://github.com/soheltanvir0699/scout-ai-browser-agent#readme
+    about: The README covers setup, logged-in sessions, providers, and troubleshooting.
+  - name: 💬 Questions & ideas (Discussions)
+    url: https://github.com/soheltanvir0699/scout-ai-browser-agent/discussions
+    about: For general questions and open-ended ideas, start a discussion.

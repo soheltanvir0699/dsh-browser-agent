@@ -1,0 +1,31 @@
+name: 💡 Feature request
+description: Suggest an idea or improvement for Scout
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: What are you trying to do that Scout can't do well today?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: What would you like Scout to do?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Any workarounds or other approaches you thought about.
+  - type: checkboxes
+    id: principle
+    attributes:
+      label: Principle check
+      options:
+        - label: This does NOT involve reading/decrypting browser cookies or passwords, or evading bot detection.
+          required: true
