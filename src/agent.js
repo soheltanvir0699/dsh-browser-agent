@@ -20,7 +20,7 @@ How to work reliably:
 - Use "type" with "submit": true for search boxes.
 - If the same action didn't change the page last time, do something different (a different element, scroll, or a direct navigate) — never repeat a failed action.
 - Be efficient: finish in as few steps as possible. If after scrolling the info still isn't there, use "done" and report what you found.
-- If a login wall appears, use "done" and tell the user to log in manually in the open window, then re-run. Never guess passwords or extract stored credentials.
+- NEVER finish the task just because a login/sign-in page appears. The app automatically pauses for the user to sign in and then continues — so do not use "done" for that, just proceed with the task. Never guess passwords or extract stored credentials.
 
 Writing the final answer (the "done" answer):
 - Give a COMPLETE, well-organized answer, not a one-line reply. Include the concrete details you saw on the page: names, numbers, dates, prices, ratings, authors, key points, and a source URL.
@@ -151,7 +151,13 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
     page = activePage(context, page);
     await page.bringToFront().catch(() => {});
 
-    // If a CAPTCHA / "unusual traffic" wall appears, hand off to the human.
+    // Observe FIRST so the page is fully settled before we decide anything —
+    // otherwise a login/CAPTCHA page gets missed because it hasn't rendered yet.
+    emit({ kind: 'activity', step, phase: 'reading', text: 'Reading the page…' });
+    let obs = await observe(page);
+
+    // If a CAPTCHA / "unusual traffic" wall appears, hand off to the human,
+    // then re-observe the page they land on.
     if (await botWall(page)) {
       emit({
         kind: 'captcha',
@@ -163,23 +169,26 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
       if (!solved)
         return 'A verification/CAPTCHA page is blocking automation and was not solved in time. Tip: I avoid Google search for this reason — try again, or give a direct Start URL (e.g. youtube.com).';
       page = activePage(context, page);
+      await page.bringToFront().catch(() => {});
+      obs = await observe(page);
     }
 
-    // If a sign-in wall appears, pause and let the user log in (once) in the
-    // open window. The session is saved in the profile and reused next time.
+    // If a sign-in wall appears, PAUSE (keep the browser open) and let the user
+    // log in once. The session is saved in the profile and reused next time.
     if (await needsLogin(page)) {
       emit({
         kind: 'login',
         step,
         text:
-          'This site needs you to sign in. Please log in in the Chrome window (you can use "Sign in with Google"), then click "I\'ve signed in". Your session is saved for next time.',
+          'This site needs you to sign in. Please log in in the Chrome window (use your normal account or "Sign in with Google"), then click "I\'ve signed in". Your session is saved for next time.',
       });
       const ok = await waitForLogin(() => (page = activePage(context, page)), signal, 300000);
       emit({ kind: 'activity', step, phase: 'reading', text: ok ? 'Signed in — continuing…' : 'Sign-in not completed.' });
       if (!ok)
-        return 'This site needs sign-in and it was not completed. Log in once in the open Chrome window, then re-run — the session will be saved and reused.';
+        return 'This site needs sign-in and it was not completed. Log in once in the open Chrome window, then re-run — the session will be saved and reused. (Or run `npm run import-profile` to bring in your existing Chrome logins.)';
       page = activePage(context, page);
       await page.bringToFront().catch(() => {});
+      obs = await observe(page);
     }
 
     // Break out of pointless repetition (e.g. clicking a link that does nothing).
@@ -190,8 +199,6 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
     }
     const stuck = executed.slice(-2).length === 2 && executed.at(-1) === executed.at(-2);
 
-    emit({ kind: 'activity', step, phase: 'reading', text: 'Reading the page…' });
-    const obs = await observe(page);
     emit({ kind: 'observation', step, url: obs.url, title: obs.title, count: obs.elements.length });
     const view = renderObservation(obs);
 
