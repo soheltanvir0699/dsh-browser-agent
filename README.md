@@ -1,8 +1,14 @@
-# 🧭 Scout
+# 🧭 Scout — Open-Source AI Browser Agent
 
-**Scout** is an open-source **AI browser agent** with a chatbot UI. Tell it to open a site or find something, and it drives a **real Chrome window** to do it — searching, clicking, filling forms, reading pages — then brings back the details, step by step, while you watch the live progress.
+> **Scout is a free, open-source AI browser agent that controls a real web browser to complete tasks you describe in plain English.** Tell it what to do — *"summarize my latest emails", "list the top 3 trending GitHub repos", "find wireless earbuds under $30"* — and Scout drives your real Chrome to read pages, click, fill forms, and use your own logged-in sessions, then brings back a clean answer. Powered by free LLMs (Groq, Google Gemini, or local Ollama) with a chatbot UI.
 
-Powered by any OpenAI-compatible model. Works great with **free providers** like Groq and Google Gemini, or a local model via Ollama.
+**Keywords:** AI browser agent · browser automation with AI · LLM web agent · autonomous web automation · Playwright AI agent · computer use agent · agentic browsing · open-source browser-use alternative · ChatGPT-style browser automation.
+
+<p>
+  <img alt="open source" src="https://img.shields.io/badge/open%20source-MIT-3c7d52">
+  <img alt="node" src="https://img.shields.io/badge/Node.js-18%2B-c15f3c">
+  <img alt="llm" src="https://img.shields.io/badge/LLM-Groq%20%7C%20Gemini%20%7C%20Ollama-5b5bd6">
+</p>
 
 > **Privacy by design:** the agent operates *inside* a real, logged-in browser session the same way you do. It **never extracts or decrypts** your cookies or saved passwords. You log into sites yourself (once) and the session persists — there is no credential-harvesting code in this repo, and PRs adding any will not be accepted.
 
@@ -28,8 +34,8 @@ Powered by any OpenAI-compatible model. Works great with **free providers** like
 
 ### 2. Install
 ```bash
-git clone https://github.com/soheltanvir0699/dsh-browser-agent.git
-cd dsh-browser-agent
+git clone https://github.com/soheltanvir0699/scout-ai-browser-agent.git
+cd scout-ai-browser-agent
 npm install
 ```
 
@@ -161,9 +167,50 @@ Each step sends the model a small prompt — the task, a short history, and only
 
 ---
 
+## 💡 Use cases
+
+- **Inbox & chat triage** — summarize your latest Gmail, Discord, or Slack messages
+- **Research & monitoring** — pull trending GitHub repos, Hacker News, prices, docs
+- **Shopping & comparison** — search products and compare prices across sites
+- **Web automation without code** — fill forms, search, click through flows in plain English
+- **Personal assistant on logged-in apps** — check notifications on X, LinkedIn, YouTube
+- **A free, local alternative** to paid AI browser agents and computer-use tools
+
+---
+
+## ❓ FAQ
+
+### What is Scout?
+Scout is an **open-source AI browser agent**: a tool that uses a large language model (LLM) to control a real web browser and complete tasks you describe in natural language, such as reading pages, clicking, filling forms, and extracting information.
+
+### Is Scout free?
+Yes. Scout is MIT-licensed and open source, and it runs on **free LLM providers** — Groq (`gpt-oss`), Google Gemini's free tier, or a fully local model via Ollama. No paid API is required.
+
+### How is Scout different from Selenium or Playwright scripts?
+Selenium/Playwright need you to write code for every step. Scout takes a **plain-English instruction** and an LLM decides each action on the fly, adapting to the page — no selectors or scripts to maintain.
+
+### How is it different from Browser Use, or OpenAI/Anthropic computer use?
+Scout is a lightweight, self-hostable, open-source alternative. It drives your **own installed Chrome** with your **own logged-in sessions**, runs on free models, and keeps everything local. There's no cloud dependency and no per-task fee.
+
+### Does Scout steal my cookies or passwords?
+No. Scout **never reads or decrypts** your browser's cookie or password store. You either sign in once in the agent's window (the session then persists), or import a local copy of your profile that **Chrome itself** decrypts. Nothing is sent anywhere except the page text the model needs to pick the next action.
+
+### Which AI models does Scout support?
+Any OpenAI-compatible endpoint: **Groq**, **Google Gemini**, **DeepSeek**, **OpenAI**, or local **Ollama** models (Qwen, Llama, etc.). Switch with one line in `.env` or the in-app settings.
+
+### Does it work with sites that require login (Gmail, Discord, X, LinkedIn)?
+Yes. When Scout hits a sign-in page it pauses and lets you log in once; the session is saved and reused. See *Using your logged-in sessions* above.
+
+### What do I need to run it?
+Node.js 18+, Google Chrome, and a free Groq API key. Then `npm install` and `npm run ui`.
+
+---
+
 ## 🤝 Contributing
 
 Issues and PRs welcome. Please keep the core principle intact: **no cookie-store or password-store extraction** — the agent gets logged-in sessions by operating a real browser you control, not by reading Chrome's encrypted stores.
+
+If Scout is useful to you, a ⭐ on GitHub helps others discover it.
 
 ## 📄 License
 
