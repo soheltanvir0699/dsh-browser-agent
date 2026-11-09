@@ -29,6 +29,16 @@
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.4);
     }
   }
+  /* Manual dark toggle — applies even when the system prefers light */
+  :root[data-theme="dark"] {
+    --bg: #262522; --bg-soft: #2e2d29; --panel: #302f2b; --border: #403e39;
+    --text: #ece9e2; --muted: #a8a49a; --faint: #78746b;
+    --accent: #d97a56; --accent-soft: #3a302a;
+    --user-bg: #46443e; --user-text: #f3f1ea;
+    --ok: #6bb281; --ok-soft: #223026; --bad: #e0876f; --bad-soft: #342320;
+    --warn: #d6a95e; --warn-soft: #302811;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.4);
+  }
   * { box-sizing: border-box; }
   html, body { height: 100%; }
   body {
@@ -246,7 +256,8 @@
   <span class="badge" id="modelBadge">connecting…</span>
   <span class="spacer"></span>
   <span class="status-pill"><span class="dot" id="dot"></span><span id="statusTxt">Ready</span></span>
-  <button class="icon-btn" id="gear" title="Options">⚙</button>
+  <button class="icon-btn" id="themeBtn" title="Toggle theme">☾</button>
+  <button class="icon-btn" id="gear" title="Settings">⚙</button>
 </header>
 
 <div class="options" id="options">
@@ -279,12 +290,12 @@
     <div class="welcome" id="welcome">
       <img class="logo" src="icon.svg" alt="Scout" style="padding:0;background:none" />
       <h1>Hi, I'm Scout</h1>
-      <p>Tell me to open a site or find something, and I'll go to a real browser, read the page, and bring back the details.</p>
+      <p>Tell me to open a site or find something — including apps you're signed into like Gmail, Discord, or X. I'll open a real browser, pause for you to log in when needed, read the page, and bring back the details.</p>
       <div class="suggestions" id="suggestions">
-        <button class="suggestion" data-q="Search for the weather in Dhaka today and tell me the temperature and conditions"><b>Research</b>Check today's weather in Dhaka</button>
-        <button class="suggestion" data-q="Go to news.ycombinator.com and summarize the top 3 stories"><b>Summarize</b>Top 3 Hacker News stories</button>
-        <button class="suggestion" data-q="Search Google for the current USD to BDT exchange rate and report it"><b>Look up</b>USD → BDT exchange rate</button>
-        <button class="suggestion" data-q="Go to wikipedia.org and tell me the featured article of the day"><b>Browse</b>Wikipedia article of the day</button>
+        <button class="suggestion" data-q="Open Gmail (mail.google.com) and summarize my 3 most recent emails — sender and subject"><b>Gmail</b>Summarize my latest emails</button>
+        <button class="suggestion" data-q="Open Discord (discord.com/app) and tell me my most recent direct message"><b>Discord</b>Show my latest message</button>
+        <button class="suggestion" data-q="Open X (x.com/notifications) and tell me my latest notifications"><b>X / Twitter</b>Check my notifications</button>
+        <button class="suggestion" data-q="Open LinkedIn (linkedin.com/notifications) and summarize my recent notifications"><b>LinkedIn</b>Summarize my notifications</button>
       </div>
     </div>
   </div>
@@ -321,6 +332,25 @@ function loadConfig() {
   }).catch(() => { $('modelBadge').textContent = 'offline'; });
 }
 loadConfig();
+
+// ── theme toggle (persisted) ──
+function effectiveTheme() {
+  return document.documentElement.dataset.theme
+    || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+}
+function applyTheme(t) {
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem('scout-theme', t); } catch {}
+  $('themeBtn').textContent = t === 'dark' ? '☀' : '☾';
+  $('themeBtn').title = t === 'dark' ? 'Switch to light' : 'Switch to dark';
+}
+(function initTheme() {
+  let saved = null;
+  try { saved = localStorage.getItem('scout-theme'); } catch {}
+  if (saved) document.documentElement.dataset.theme = saved;
+  $('themeBtn').textContent = effectiveTheme() === 'dark' ? '☀' : '☾';
+})();
+$('themeBtn').onclick = () => applyTheme(effectiveTheme() === 'dark' ? 'light' : 'dark');
 
 // ── settings drawer ──
 $('gear').onclick = () => $('options').classList.toggle('open');
