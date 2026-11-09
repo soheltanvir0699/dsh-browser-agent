@@ -44,7 +44,7 @@ Open `.env` and set a provider. **Groq is free, fast, and recommended:**
    ```env
    LLM_BASE_URL=https://api.groq.com/openai/v1
    LLM_API_KEY=gsk_your_key_here
-   LLM_MODEL=openai/gpt-oss-120b
+   LLM_MODEL=openai/gpt-oss-20b
    ```
 
 <details>
@@ -153,6 +153,7 @@ Each step sends the model a small prompt — the task, a short history, and only
 |---|---|
 | **`json_validate_failed` / "Failed to generate JSON"** | Set `LLM_JSON_MODE=false` in `.env` (default). Reasoning models like `gpt-oss` answer in prose; strict JSON mode rejects it. |
 | **`model does not exist`** (Groq) | Model names change. List yours: `curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $LLM_API_KEY"` and update `LLM_MODEL`. |
+| **Task hangs or is very slow** | Use a fast model. `openai/gpt-oss-20b` is quick on large pages; `gpt-oss-120b` can stall on big prompts. Set it in the ⚙ settings or `.env`. |
 | **Rate limit (429)** | Free-tier limit — wait a minute, or switch model/provider in `.env`. |
 | **Raw Markdown shown in chat** | Hard-refresh the page (**Cmd/Ctrl + Shift + R**) to clear the cached old page. |
 | **Not logged into a site** | Use sign-in handoff (Option 1) or `npm run import-profile` (Option 2) above. |

@@ -22,6 +22,19 @@ How to work reliably:
 - Be efficient: finish in as few steps as possible. If after scrolling the info still isn't there, use "done" and report what you found.
 - NEVER finish the task just because a login/sign-in page appears. The app automatically pauses for the user to sign in and then continues — so do not use "done" for that, just proceed with the task. Never guess passwords or extract stored credentials.
 
+Interacting with complex pages (this is how you avoid getting stuck):
+- PREFER A RESULTS URL over fighting a widget. Build the URL and navigate to it directly:
+    • YouTube search → https://www.youtube.com/results?search_query=QUERY
+    • Amazon search → https://www.amazon.com/s?k=QUERY
+    • Google Maps search → https://www.google.com/maps/search/QUERY
+    • Wikipedia → https://en.wikipedia.org/wiki/TOPIC
+    • Google Flights (fill the form in the URL) → https://www.google.com/travel/flights?q=Flights%20from%20DAC%20to%20DXB%20on%20YYYY-MM-DD
+  Use "+" or %20 for spaces. This skips autocomplete, date pickers and dropdowns entirely.
+- Autocomplete / "search as you type" fields (locations, airports, products): type the text but do NOT set submit:true. Then WAIT one step and CLICK the matching option in the suggestion list. Pressing Enter on these often opens the wrong page.
+- If a click or type FAILS, or an element becomes invisible, do NOT try the same element again. Switch strategy immediately: a different element, scroll, or a direct results URL.
+- Date pickers and multi-field forms: if you can't set a field within 2 tries, continue with what is shown or report the best answer visible. Never loop on the same widget.
+- You have limited steps — when you have enough information to answer, STOP and use "done".
+
 Writing the final answer (the "done" answer):
 - Give a COMPLETE, well-organized answer, not a one-line reply. Include the concrete details you saw on the page: names, numbers, dates, prices, ratings, authors, key points, and a source URL.
 - Format with Markdown so it reads well (it is rendered richly): a short intro line, "## headings" to group sections, "- " bullets for lists, "**bold**" for labels, Markdown tables when comparing rows of data, and [text](url) links.
@@ -53,8 +66,20 @@ function parseAction(raw) {
     } catch {}
   }
 
-  // No usable JSON action — the model answered in prose/markdown. That IS the
-  // final answer, so finish with it instead of erroring or looping.
+  // Salvage a "done" answer from MALFORMED JSON — gpt-oss often writes the
+  // markdown answer with real line breaks, which is invalid JSON. Pull the
+  // answer string out directly (this regex handles escaped quotes + raw newlines).
+  if (/"type"\s*:\s*"done"/.test(s)) {
+    const m = s.match(/"answer"\s*:\s*"((?:[^"\\]|\\.)*)"/);
+    if (m) {
+      const answer = m[1]
+        .replace(/\\n/g, '\n').replace(/\\t/g, '\t').replace(/\\r/g, '')
+        .replace(/\\"/g, '"').replace(/\\\\/g, '\\');
+      return { thought: '', action: { type: 'done', answer } };
+    }
+  }
+
+  // Otherwise the model answered in prose/markdown — treat it as the answer.
   if (s) return { thought: '', action: { type: 'done', answer: s } };
   throw new Error('empty response');
 }

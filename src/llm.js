@@ -13,8 +13,12 @@
 export async function chat({ baseUrl, apiKey, model, messages, jsonMode = true }) {
   const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
 
-  const call = (useJson) =>
-    fetch(url, {
+  const call = (useJson) => {
+    // Hard timeout so a hung request can never block a task forever.
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 45000);
+    return fetch(url, {
+      signal: ctrl.signal,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -27,9 +31,12 @@ export async function chat({ baseUrl, apiKey, model, messages, jsonMode = true }
         // Reasoning models (gpt-oss) spend tokens thinking before the answer;
         // without enough room the JSON gets cut off -> json_validate_failed.
         max_tokens: 6000,
+        // Keep reasoning light so each step is fast (gpt-oss on Groq only).
+        ...(/gpt-oss/i.test(model) ? { reasoning_effort: process.env.LLM_REASONING || 'low' } : {}),
         ...(useJson ? { response_format: { type: 'json_object' } } : {}),
       }),
-    });
+    }).finally(() => clearTimeout(timer));
+  };
 
   // Matches the various ways a backend signals "JSON mode didn't work".
   const jsonModeTrouble = (txt) =>

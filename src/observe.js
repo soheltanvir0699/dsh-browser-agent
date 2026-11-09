@@ -25,7 +25,7 @@ const COLLECT = () => {
   const seen = new Set();
   const out = [];
   let id = 0;
-  const MAX = 150;
+  const MAX = 90;
 
   for (const el of document.querySelectorAll(selector)) {
     if (seen.has(el) || !isDisplayed(el)) continue;
@@ -57,7 +57,7 @@ const COLLECT = () => {
   }
 
   // Visible page text — what a human would actually read.
-  const text = (document.body?.innerText || '').replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim().slice(0, 4000);
+  const text = (document.body?.innerText || '').replace(/\n{3,}/g, '\n\n').replace(/[ \t]+/g, ' ').trim().slice(0, 2800);
 
   return { elements: out, text };
 };
