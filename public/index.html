@@ -121,7 +121,9 @@
   .welcome .logo { width: 52px; height: 52px; border-radius: 15px; font-size: 26px; margin: 0 auto 16px; }
   .welcome h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 27px; color: var(--text); margin: 0 0 8px; font-weight: 600; letter-spacing: -0.01em; }
   .welcome p { margin: 0 auto; max-width: 440px; }
-  .suggestions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 540px; margin: 26px auto 0; }
+  .suggestions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 540px; margin: 0 auto; }
+  .sugg-label { max-width: 540px; margin: 22px auto 9px; text-align: left; font-size: 11.5px; font-weight: 600; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; }
+  .welcome .sugg-label:first-of-type { margin-top: 26px; }
   .suggestion {
     text-align: left; border: 1px solid var(--border); background: var(--panel); border-radius: 12px;
     padding: 12px 14px; cursor: pointer; font-size: 13.5px; color: var(--text); transition: .15s;
@@ -291,11 +293,19 @@
       <img class="logo" src="icon.svg" alt="Scout" style="padding:0;background:none" />
       <h1>Hi, I'm Scout</h1>
       <p>Tell me to open a site or find something — including apps you're signed into like Gmail, Discord, or X. I'll open a real browser, pause for you to log in when needed, read the page, and bring back the details.</p>
-      <div class="suggestions" id="suggestions">
+      <div class="sugg-label">Your signed-in apps</div>
+      <div class="suggestions">
         <button class="suggestion" data-q="Open Gmail (mail.google.com) and summarize my 3 most recent emails — sender and subject"><b>Gmail</b>Summarize my latest emails</button>
         <button class="suggestion" data-q="Open Discord (discord.com/app) and tell me my most recent direct message"><b>Discord</b>Show my latest message</button>
         <button class="suggestion" data-q="Open X (x.com/notifications) and tell me my latest notifications"><b>X / Twitter</b>Check my notifications</button>
         <button class="suggestion" data-q="Open LinkedIn (linkedin.com/notifications) and summarize my recent notifications"><b>LinkedIn</b>Summarize my notifications</button>
+      </div>
+      <div class="sugg-label">Automations — Scout does the steps</div>
+      <div class="suggestions">
+        <button class="suggestion" data-q="Go to amazon.com, search for 'wireless earbuds under 30 dollars', and list the top 3 results with their price and rating"><b>Shop & compare</b>Top 3 wireless earbuds under $30</button>
+        <button class="suggestion" data-q="Go to youtube.com, search for 'lofi hip hop radio', open the first video, and tell me its title and channel"><b>YouTube</b>Search and open a video</button>
+        <button class="suggestion" data-q="Go to google.com/flights and find the cheapest flight from Dhaka (DAC) to Dubai (DXB) next month, then report the airline and price"><b>Flights</b>Find the cheapest Dhaka → Dubai</button>
+        <button class="suggestion" data-q="Go to maps.google.com and search for coffee shops in Gulshan, Dhaka, then list the top 3 with their ratings"><b>Maps</b>Find coffee shops near Gulshan</button>
       </div>
     </div>
   </div>
