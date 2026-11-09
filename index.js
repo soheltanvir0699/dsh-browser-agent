@@ -37,7 +37,7 @@ async function main() {
   if (args.startUrl) {
     await page.goto(args.startUrl, { waitUntil: 'domcontentloaded' });
   } else if (page.url() === 'about:blank') {
-    await page.goto('https://www.google.com', { waitUntil: 'domcontentloaded' });
+    await page.goto('https://duckduckgo.com', { waitUntil: 'domcontentloaded' });
   }
 
   // Human-in-the-loop: confirm each action unless --auto.

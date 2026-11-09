@@ -106,7 +106,7 @@ app.post('/run', async (req, res) => {
     const page = session.browser.page;
     if (startUrl) await page.goto(startUrl, { waitUntil: 'domcontentloaded' });
     else if (page.url() === 'about:blank')
-      await page.goto('https://www.google.com', { waitUntil: 'domcontentloaded' });
+      await page.goto('https://duckduckgo.com', { waitUntil: 'domcontentloaded' });
 
     broadcast({ kind: 'status', text: `running: ${task}` });
     const answer = await runAgent({

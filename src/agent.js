@@ -17,6 +17,7 @@ Respond with ONE action as JSON (no prose), choosing from:
 
 Rules:
 - Only reference element ids that appear in the CURRENT PAGE list.
+- For searches, prefer going DIRECTLY to the relevant site (e.g. youtube.com for a song/video, wikipedia.org for facts) or use https://duckduckgo.com. Avoid google.com/search — it frequently blocks automation with a CAPTCHA.
 - If the answer is already visible on the current page, use "done" IMMEDIATELY — do not click deeper or navigate away to "confirm" it.
 - Be efficient: aim to finish in as few steps as possible. Avoid opening extra links when the page already shows what you need.
 - If a login form appears and you don't have credentials, use "done" and tell the user to log in manually in the open browser, then re-run.
@@ -44,6 +45,36 @@ function parseAction(raw) {
   return obj.action ? obj : { thought: '', action: obj };
 }
 
+// Detect CAPTCHA / "unusual traffic" bot-walls so we can hand off to the human.
+async function botWall(page) {
+  const url = page.url().toLowerCase();
+  if (url.includes('/sorry/') || url.includes('/captcha') || url.includes('ipv4check')) return true;
+  try {
+    return await page.evaluate(() => {
+      const t = (document.title || '').toLowerCase();
+      const b = (document.body?.innerText || '').slice(0, 2500).toLowerCase();
+      const s = t + ' ' + b;
+      return (
+        /unusual traffic|are you a robot|not a robot|verify (you are |you're )?human|detected unusual|complete the security check/.test(s) ||
+        !!document.querySelector('iframe[src*="recaptcha"], iframe[title*="recaptcha" i], #captcha, .g-recaptcha')
+      );
+    });
+  } catch {
+    return false;
+  }
+}
+
+// Wait for the human to clear the bot-wall in the open window.
+async function waitForHuman(page, maxMs, signal) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    if (signal?.stopped) return false;
+    await page.waitForTimeout(2500);
+    if (!(await botWall(page))) return true;
+  }
+  return false;
+}
+
 // Follow the user into whatever tab is now active (clicks often open new tabs).
 function activePage(context, fallback) {
   if (!context) return fallback;
@@ -63,6 +94,19 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
     // Switch to the newest tab if a previous action opened one.
     page = activePage(context, page);
     await page.bringToFront().catch(() => {});
+
+    // If a CAPTCHA / "unusual traffic" wall appears, hand off to the human.
+    if (await botWall(page)) {
+      emit({
+        kind: 'captcha',
+        step,
+        text: 'A human-verification page appeared. Please solve it in the Chrome window — I\'ll continue automatically.',
+      });
+      const solved = await waitForHuman(page, 150000, signal);
+      emit({ kind: 'activity', step, phase: 'reading', text: solved ? 'Verification cleared — continuing…' : 'Still blocked.' });
+      if (!solved)
+        return 'A verification/CAPTCHA page is blocking automation and was not solved in time. Tip: I avoid Google search for this reason — try again, or give a direct Start URL (e.g. youtube.com).';
+    }
 
     // Break out of pointless repetition (e.g. clicking a link that does nothing).
     const tail = executed.slice(-4);

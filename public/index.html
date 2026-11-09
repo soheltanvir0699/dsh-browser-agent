@@ -355,6 +355,14 @@ function render(ev) {
       turn.live.before(card); scrollDown();
       break;
     }
+    case 'captcha': {
+      liveText('🛡️ Waiting for you to solve the verification…');
+      const c = document.createElement('div');
+      c.className = 'confirm';
+      c.innerHTML = `<div class="t">🛡️ Human verification needed</div><div>${esc(ev.text)}</div>`;
+      turn.live.before(c); scrollDown();
+      break;
+    }
     case 'finished':
       finishTurn();
       addAnswer(ev.answer);
