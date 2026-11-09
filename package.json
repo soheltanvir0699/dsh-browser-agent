@@ -1,0 +1,19 @@
+{
+  "name": "dsh-browser-agent",
+  "version": "0.1.0",
+  "description": "Open-source browser agent: drives your real Chrome to complete tasks, powered by DeepSeek. Uses your own logged-in sessions — never extracts or decrypts credentials.",
+  "type": "module",
+  "bin": {
+    "dsh-agent": "./index.js"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "ui": "node server.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.21.0",
+    "playwright": "^1.48.0"
+  }
+}

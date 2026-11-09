@@ -1,0 +1,5 @@
+node_modules/
+.env
+.agent-profile/
+*.log
+.DS_Store
