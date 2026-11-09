@@ -1,6 +1,6 @@
-# 🧭 Browser Agent
+# 🧭 Scout
 
-An open-source **AI browser agent** with a chatbot UI. Describe a task in plain language and it drives a **real Chrome window** to do it — searching, clicking, filling forms, reading pages — step by step, while you watch the live progress.
+**Scout** is an open-source **AI browser agent** with a chatbot UI. Tell it to open a site or find something, and it drives a **real Chrome window** to do it — searching, clicking, filling forms, reading pages — then brings back the details, step by step, while you watch the live progress.
 
 Powered by any OpenAI-compatible model. Works great with **free providers** like Groq and Google Gemini, or a local model via Ollama.
 
@@ -89,11 +89,35 @@ Without `--auto`, it asks before each action (Enter = yes, `n` = skip, `q` = qui
 
 ---
 
-## 🔑 Logging into sites
+## 🔑 Using your logged-in sessions (sites that need sign-in)
 
-The agent uses a **dedicated Chrome profile** (`.agent-profile/`, created on first run), separate from your main Chrome. The first time a task needs a login, log in manually in the open window — the session is saved and reused next time. Chrome's own password manager autofills; the agent just submits.
+Scout runs in a **dedicated Chrome profile** (`.agent-profile/`, git-ignored), separate from your everyday Chrome. There are two ways to be logged in — pick either.
 
-> **Want your main profile's logins?** You can attach to a Chrome you start with `--remote-debugging-port=9222` and tick *"Use my main Chrome"* in the UI. Note: Chrome 136+ blocks remote debugging on the default profile for security, so the dedicated profile above is the recommended path.
+### Option 1 — Sign in once (recommended, nothing copied)
+Just run a task. The first time Scout hits a login page it **pauses and shows a "🔑 Sign-in needed" card**. Sign in **once** in the open Chrome window (use **"Sign in with Google"** where offered) and click **"I've signed in"**. The session is saved in the profile and **reused automatically forever** after. Do this once per site.
+
+### Option 2 — Import your existing Chrome logins
+Copy your real Chrome sessions into Scout so it starts already logged in:
+
+```bash
+# 1. Fully QUIT Chrome (Cmd+Q — no Chrome left running)
+# 2. Import:
+npm run import-profile
+# 3. Start Scout (leave "Use my main Chrome" UNCHECKED):
+npm run ui
+```
+
+On first launch, Chrome may ask to use **"Chrome Safe Storage"** from your keychain — click **Allow** (that's how it decrypts *its own* cookies). Most sites come over logged in. **Gmail/Google may still re-auth once** because Google now binds sessions to the device (DBSC); after you sign in once, it persists.
+
+### Why it copies instead of reading your live browser
+Silently reading and decrypting a running browser's cookie/password store is exactly how credential-stealing malware works — so Scout never does that. Instead:
+- **Option 1** signs in through a real browser you control.
+- **Option 2** copies your profile locally; **Chrome itself** decrypts its own cookies via your keychain. Scout never reads or decrypts a credential, and nothing leaves your machine (`.agent-profile/` is git-ignored).
+
+> **Note on "Use my main Chrome" (CDP):** attaching over `--remote-debugging-port=9222` exists, but **Chrome 136+ blocks remote debugging on your main profile** for security, so it can't carry your real logins. Use Option 1 or 2 instead.
+
+### A note on CAPTCHAs
+Scout avoids Google Search (it blocks automation) and prefers DuckDuckGo or going directly to the target site. If a human-verification page still appears, Scout **pauses and asks you to solve it** in the window, then continues. It never tries to bypass a bot check.
 
 ---
 
@@ -111,14 +135,28 @@ Each step sends the model a small prompt — the task, a short history, and only
 | File | Purpose |
 |------|---------|
 | `server.js` | Web server + live event stream (SSE) for the UI |
-| `public/index.html` | The chatbot UI |
+| `public/index.html` | The chatbot UI (Markdown rendering via vendored marked + DOMPurify) |
 | `index.js` | CLI entry point |
+| `import-profile.js` | Copy your Chrome logins into the agent profile |
 | `src/browser.js` | Launch dedicated profile / attach over CDP |
-| `src/observe.js` | Snapshot the page into a model-friendly element list |
-| `src/actions.js` | Execute one action |
-| `src/agent.js` | The observe → decide → act loop |
-| `src/llm.js` | OpenAI-compatible model call (with retry) |
+| `src/observe.js` | Snapshot the page: visible text + interactive elements |
+| `src/actions.js` | Execute one action (robust click/type) |
+| `src/agent.js` | The observe → decide → act loop (login/CAPTCHA handoff, loop guard) |
+| `src/llm.js` | OpenAI-compatible model call (JSON-mode fallback + retry) |
 | `src/config.js` | Provider-neutral configuration |
+
+---
+
+## 🩺 Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| **`json_validate_failed` / "Failed to generate JSON"** | Set `LLM_JSON_MODE=false` in `.env` (default). Reasoning models like `gpt-oss` answer in prose; strict JSON mode rejects it. |
+| **`model does not exist`** (Groq) | Model names change. List yours: `curl -s https://api.groq.com/openai/v1/models -H "Authorization: Bearer $LLM_API_KEY"` and update `LLM_MODEL`. |
+| **Rate limit (429)** | Free-tier limit — wait a minute, or switch model/provider in `.env`. |
+| **Raw Markdown shown in chat** | Hard-refresh the page (**Cmd/Ctrl + Shift + R**) to clear the cached old page. |
+| **Not logged into a site** | Use sign-in handoff (Option 1) or `npm run import-profile` (Option 2) above. |
+| **Port 3000 busy** | `PORT=4000 npm run ui`. |
 
 ---
 

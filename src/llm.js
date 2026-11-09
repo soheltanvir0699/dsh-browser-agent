@@ -1,6 +1,13 @@
 /**
- * Minimal DeepSeek client (OpenAI-compatible chat completions).
+ * Minimal OpenAI-compatible chat client (DeepSeek / Groq / Gemini / Ollama…).
  * Uses the global fetch in Node 18+. No SDK dependency.
+ *
+ * Resilience built in:
+ *  - If strict JSON mode is rejected or fails validation (Groq's gpt-oss can
+ *    return json_validate_failed with an empty generation), retry WITHOUT JSON
+ *    mode — the caller's prompt already demands JSON and the parser is tolerant.
+ *  - If the model returns empty content under JSON mode, retry without it.
+ *  - Back off and retry on 429 rate limits.
  */
 
 export async function chat({ baseUrl, apiKey, model, messages, jsonMode = true }) {
@@ -17,16 +24,25 @@ export async function chat({ baseUrl, apiKey, model, messages, jsonMode = true }
         model,
         messages,
         temperature: 0,
+        // Reasoning models (gpt-oss) spend tokens thinking before the answer;
+        // without enough room the JSON gets cut off -> json_validate_failed.
+        max_tokens: 6000,
         ...(useJson ? { response_format: { type: 'json_object' } } : {}),
       }),
     });
 
+  // Matches the various ways a backend signals "JSON mode didn't work".
+  const jsonModeTrouble = (txt) =>
+    /response_format|json_object|json[_ ]?validate|validate\s+json|failed_generation|adjust your prompt/i.test(
+      txt
+    );
+
   let res = await call(jsonMode);
 
-  // Some local backends reject response_format — retry once without it.
+  // JSON mode rejected or failed validation — retry once in plain mode.
   if (!res.ok && jsonMode) {
     const peek = await res.clone().text().catch(() => '');
-    if (res.status === 400 && /response_format|format/i.test(peek)) {
+    if ((res.status === 400 || res.status === 422) && jsonModeTrouble(peek)) {
       res = await call(false);
     }
   }
@@ -45,6 +61,18 @@ export async function chat({ baseUrl, apiKey, model, messages, jsonMode = true }
       throw new Error('Rate limit reached on the free tier. Wait a minute and try again, or switch model/provider in .env.');
     throw new Error(`LLM API ${res.status}: ${body.slice(0, 400)}`);
   }
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content ?? '';
+
+  let data = await res.json();
+  let content = data.choices?.[0]?.message?.content ?? '';
+
+  // Empty generation under JSON mode (gpt-oss sometimes does this) — retry plain.
+  if ((!content || !content.trim()) && jsonMode) {
+    const res2 = await call(false);
+    if (res2.ok) {
+      data = await res2.json();
+      content = data.choices?.[0]?.message?.content ?? content;
+    }
+  }
+
+  return content;
 }

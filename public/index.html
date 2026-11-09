@@ -3,7 +3,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Browser Agent</title>
+<link rel="icon" type="image/svg+xml" href="icon.svg" />
+<title>Scout — AI Browser Agent</title>
+<script src="vendor/marked.min.js"></script>
+<script src="vendor/purify.min.js"></script>
 <style>
   :root {
     --bg: #ffffff; --bg-soft: #f7f7f8; --panel: #ffffff; --border: #e6e6e9;
@@ -123,6 +126,31 @@
     padding: 13px 16px; box-shadow: var(--shadow); font-size: 14.5px; white-space: pre-wrap; word-wrap: break-word;
   }
   .answer.error { border-color: var(--bad); background: var(--bad-soft); color: var(--bad); }
+  /* Rich markdown answer — Claude/ChatGPT-like typography */
+  .answer { line-height: 1.65; }
+  .answer > *:first-child { margin-top: 0; }
+  .answer > *:last-child { margin-bottom: 0; }
+  .answer p { margin: 10px 0; }
+  .answer h1, .answer h2, .answer h3, .answer h4 { margin: 18px 0 8px; line-height: 1.3; font-weight: 650; }
+  .answer h1 { font-size: 20px; } .answer h2 { font-size: 18px; } .answer h3 { font-size: 16px; } .answer h4 { font-size: 15px; }
+  .answer ul, .answer ol { margin: 8px 0; padding-left: 22px; }
+  .answer li { margin: 4px 0; }
+  .answer li > ul, .answer li > ol { margin: 4px 0; }
+  .answer a { color: var(--accent); text-decoration: none; }
+  .answer a:hover { text-decoration: underline; }
+  .answer strong, .answer b { font-weight: 650; }
+  .answer code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px;
+    background: var(--bg-soft); border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px; }
+  .answer pre { background: var(--bg-soft); border: 1px solid var(--border); border-radius: 10px;
+    padding: 12px 14px; overflow-x: auto; margin: 12px 0; }
+  .answer pre code { background: none; border: none; padding: 0; font-size: 13px; line-height: 1.5; }
+  .answer blockquote { margin: 10px 0; padding: 4px 14px; border-left: 3px solid var(--border); color: var(--muted); }
+  .answer hr { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+  .answer table { border-collapse: collapse; margin: 12px 0; width: 100%; font-size: 13.5px; display: block; overflow-x: auto; }
+  .answer th, .answer td { border: 1px solid var(--border); padding: 7px 11px; text-align: left; }
+  .answer th { background: var(--bg-soft); font-weight: 650; }
+  .answer tr:nth-child(even) td { background: color-mix(in srgb, var(--bg-soft) 50%, transparent); }
+  .answer img { max-width: 100%; border-radius: 8px; }
 
   /* work log */
   .worklog { border: 1px solid var(--border); border-radius: 14px; background: var(--bg-soft); overflow: hidden; margin-bottom: 10px; }
@@ -202,7 +230,7 @@
 </head>
 <body>
 <header>
-  <div class="brand"><span class="logo">◆</span> Browser Agent</div>
+  <div class="brand"><img class="logo" src="icon.svg" alt="Scout" style="padding:0;background:none" /> Scout</div>
   <span class="badge" id="modelBadge">connecting…</span>
   <span class="spacer"></span>
   <span class="status-pill"><span class="dot" id="dot"></span><span id="statusTxt">Ready</span></span>
@@ -218,9 +246,9 @@
 <main id="main">
   <div class="thread" id="thread">
     <div class="welcome" id="welcome">
-      <div class="logo">◆</div>
-      <h1>What should I do in the browser?</h1>
-      <p>Describe a task in plain language. I'll open a real Chrome window and do it step by step.</p>
+      <img class="logo" src="icon.svg" alt="Scout" style="padding:0;background:none" />
+      <h1>Hi, I'm Scout</h1>
+      <p>Tell me to open a site or find something, and I'll go to a real browser, read the page, and bring back the details.</p>
       <div class="suggestions" id="suggestions">
         <button class="suggestion" data-q="Search for the weather in Dhaka today and tell me the temperature and conditions"><b>Research</b>Check today's weather in Dhaka</button>
         <button class="suggestion" data-q="Go to news.ycombinator.com and summarize the top 3 stories"><b>Summarize</b>Top 3 Hacker News stories</button>
@@ -289,7 +317,7 @@ function startAssistantTurn() {
   const el = document.createElement('div');
   el.className = 'turn';
   el.innerHTML = `
-    <div class="avatar bot">◆</div>
+    <div class="avatar bot"><img src="icon.svg" alt="" style="width:20px;height:20px" /></div>
     <div class="turn-body">
       <div class="worklog" id="wl">
         <div class="worklog-head"><span class="mini-spinner" id="wlspin"></span><span id="wltitle">Working on it…</span><span class="chev">▾</span></div>
@@ -394,11 +422,46 @@ function finishTurn() {
   const t = turn.el.querySelector('#wltitle'); if (t) t.textContent = `Worked for ${turn.count} step${turn.count===1?'':'s'}`;
   turn.wl.classList.add('collapsed');
 }
+// Rich Markdown via marked + DOMPurify (like Claude/ChatGPT). Falls back to
+// the tiny parser below if the CDN libraries didn't load.
+if (window.DOMPurify) {
+  DOMPurify.addHook('afterSanitizeAttributes', (n) => {
+    if (n.tagName === 'A') { n.setAttribute('target', '_blank'); n.setAttribute('rel', 'noopener noreferrer'); }
+  });
+}
+function renderMarkdown(src) {
+  if (window.marked && window.DOMPurify) {
+    try {
+      const html = marked.parse(String(src || ''), { gfm: true, breaks: true });
+      return DOMPurify.sanitize(html);
+    } catch {}
+  }
+  return mdLite(src);
+}
+
+// Minimal, safe Markdown fallback: escape first, then apply bold, links, bullets.
+function mdLite(src) {
+  let s = esc(src || '(no answer)');
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+  s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" target="_blank" rel="noopener">$2</a>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+  const lines = s.split('\n');
+  let html = '', inList = false;
+  for (const ln of lines) {
+    const m = ln.match(/^\s*[-*]\s+(.*)$/);
+    if (m) { if (!inList) { html += '<ul>'; inList = true; } html += `<li>${m[1]}</li>`; }
+    else { if (inList) { html += '</ul>'; inList = false; } if (ln.trim()) html += `<div>${ln}</div>`; }
+  }
+  if (inList) html += '</ul>';
+  return html;
+}
+
 function addAnswer(text, isError) {
   if (!turn) return;
   const a = document.createElement('div');
   a.className = 'answer' + (isError ? ' error' : '');
-  a.textContent = text || '(no answer)';
+  if (isError) a.textContent = text || '(no answer)';
+  else a.innerHTML = renderMarkdown(text);
   turn.el.querySelector('.turn-body').appendChild(a);
   scrollDown();
 }

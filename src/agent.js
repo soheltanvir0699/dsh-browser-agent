@@ -21,7 +21,12 @@ How to work reliably:
 - If the same action didn't change the page last time, do something different (a different element, scroll, or a direct navigate) — never repeat a failed action.
 - Be efficient: finish in as few steps as possible. If after scrolling the info still isn't there, use "done" and report what you found.
 - If a login wall appears, use "done" and tell the user to log in manually in the open window, then re-run. Never guess passwords or extract stored credentials.
-- Always finish with "done" and a clear, complete answer in plain language.`;
+
+Writing the final answer (the "done" answer):
+- Give a COMPLETE, well-organized answer, not a one-line reply. Include the concrete details you saw on the page: names, numbers, dates, prices, ratings, authors, key points, and a source URL.
+- Format with Markdown so it reads well (it is rendered richly): a short intro line, "## headings" to group sections, "- " bullets for lists, "**bold**" for labels, Markdown tables when comparing rows of data, and [text](url) links.
+- If the user said "open X", briefly say what the page is, then the specific information they wanted.
+- Only include what you actually saw on the page — never invent details. If something wasn't available, say so.`;
 
 function describeAction(a) {
   switch (a.type) {
@@ -36,11 +41,22 @@ function describeAction(a) {
 }
 
 function parseAction(raw) {
-  // Be tolerant of stray text / code fences around the JSON.
-  const match = raw.match(/\{[\s\S]*\}/);
-  const json = match ? match[0] : raw;
-  const obj = JSON.parse(json);
-  return obj.action ? obj : { thought: '', action: obj };
+  const s = (raw || '').trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+
+  // Try to find a JSON action object anywhere in the text.
+  const match = s.match(/\{[\s\S]*\}/);
+  if (match) {
+    try {
+      const obj = JSON.parse(match[0]);
+      const parsed = obj.action ? obj : obj.type ? { thought: obj.thought || '', action: obj } : null;
+      if (parsed?.action?.type) return parsed;
+    } catch {}
+  }
+
+  // No usable JSON action — the model answered in prose/markdown. That IS the
+  // final answer, so finish with it instead of erroring or looping.
+  if (s) return { thought: '', action: { type: 'done', answer: s } };
+  throw new Error('empty response');
 }
 
 // Detect a sign-in wall so we can hand off to the human to log in (once).
