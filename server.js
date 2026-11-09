@@ -3,13 +3,34 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { launchProfile, connectCDP } from './src/browser.js';
 import { runAgent } from './src/agent.js';
 import { loadConfig } from './src/config.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const cfg = loadConfig();
+let cfg = loadConfig();
+
+function providerOf(baseUrl) {
+  return /groq/.test(baseUrl) ? 'Groq'
+    : /deepseek/.test(baseUrl) ? 'DeepSeek'
+    : /googleapis/.test(baseUrl) ? 'Gemini'
+    : /localhost|127\.0\.0\.1/.test(baseUrl) ? 'Local'
+    : 'LLM';
+}
+
+// Persist updated settings to .env so they survive a restart.
+function persistEnv(updates) {
+  const envPath = path.join(__dirname, '.env');
+  let lines = existsSync(envPath) ? readFileSync(envPath, 'utf8').split('\n') : [];
+  for (const [k, v] of Object.entries(updates)) {
+    let found = false;
+    lines = lines.map((l) => (l.startsWith(k + '=') ? ((found = true), `${k}=${v}`) : l));
+    if (!found) lines.push(`${k}=${v}`);
+  }
+  writeFileSync(envPath, lines.join('\n'));
+}
 
 const app = express();
 app.use(express.json());
@@ -29,18 +50,24 @@ function broadcast(ev) {
   for (const res of session.clients) res.write(line);
 }
 
-// Expose the active model/provider for the UI badge
+// Expose the active model/provider for the UI badge (never returns the key)
 app.get('/config', (req, res) => {
-  const provider = /groq/.test(cfg.baseUrl)
-    ? 'Groq'
-    : /deepseek/.test(cfg.baseUrl)
-    ? 'DeepSeek'
-    : /googleapis/.test(cfg.baseUrl)
-    ? 'Gemini'
-    : /localhost|127\.0\.0\.1/.test(cfg.baseUrl)
-    ? 'Local'
-    : 'LLM';
-  res.json({ provider, model: cfg.model, running: session.running });
+  res.json({
+    provider: providerOf(cfg.baseUrl),
+    model: cfg.model,
+    hasKey: !!(cfg.apiKey && cfg.apiKey !== 'ollama'),
+    running: session.running,
+  });
+});
+
+// Update the API key and/or model from the UI (persists to .env)
+app.post('/settings', (req, res) => {
+  const { apiKey, model } = req.body || {};
+  const updates = {};
+  if (typeof apiKey === 'string' && apiKey.trim()) { cfg.apiKey = apiKey.trim(); updates.LLM_API_KEY = cfg.apiKey; }
+  if (typeof model === 'string' && model.trim()) { cfg.model = model.trim(); updates.LLM_MODEL = cfg.model; }
+  if (Object.keys(updates).length) { try { persistEnv(updates); } catch {} }
+  res.json({ ok: true, provider: providerOf(cfg.baseUrl), model: cfg.model, hasKey: !!(cfg.apiKey && cfg.apiKey !== 'ollama') });
 });
 
 // SSE stream of agent events

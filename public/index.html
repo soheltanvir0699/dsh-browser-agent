@@ -9,24 +9,24 @@
 <script src="vendor/purify.min.js"></script>
 <style>
   :root {
-    --bg: #ffffff; --bg-soft: #f7f7f8; --panel: #ffffff; --border: #e6e6e9;
-    --text: #1f2023; --muted: #6b6f76; --faint: #9aa0a8;
-    --accent: #5b5bd6; --accent-soft: #eeeefb; --accent-text: #ffffff;
-    --user-bg: #5b5bd6; --user-text: #ffffff;
-    --ok: #1a8f4c; --ok-soft: #e7f6ed; --bad: #c33a3a; --bad-soft: #fbeaea;
-    --warn: #9a6a00; --warn-soft: #fdf4e0;
-    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
-    --radius: 16px;
+    --bg: #f5f4ee; --bg-soft: #efede4; --panel: #fdfcf9; --border: #e4e1d5;
+    --text: #27251f; --muted: #6f6c62; --faint: #a39f92;
+    --accent: #c15f3c; --accent-soft: #f6e9e2; --accent-text: #ffffff;
+    --user-bg: #30302b; --user-text: #f5f4ee;
+    --ok: #3c7d52; --ok-soft: #e7f1e6; --bad: #b4452f; --bad-soft: #f6e4df;
+    --warn: #9a6a1e; --warn-soft: #f7ecd8;
+    --shadow: 0 1px 2px rgba(60,50,30,.05), 0 10px 30px rgba(60,50,30,.07);
+    --radius: 18px;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #1a1b1e; --bg-soft: #202226; --panel: #25262b; --border: #33353b;
-      --text: #ececee; --muted: #a0a4ad; --faint: #767a83;
-      --accent: #8f8ff0; --accent-soft: #2b2b3a;
-      --user-bg: #5b5bd6; --user-text: #ffffff;
-      --ok: #4cc47d; --ok-soft: #16331f; --bad: #f08a8a; --bad-soft: #341a1a;
-      --warn: #e0b45a; --warn-soft: #2e2713;
-      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.35);
+      --bg: #262522; --bg-soft: #2e2d29; --panel: #302f2b; --border: #403e39;
+      --text: #ece9e2; --muted: #a8a49a; --faint: #78746b;
+      --accent: #d97a56; --accent-soft: #3a302a;
+      --user-bg: #46443e; --user-text: #f3f1ea;
+      --ok: #6bb281; --ok-soft: #223026; --bad: #e0876f; --bad-soft: #342320;
+      --warn: #d6a95e; --warn-soft: #302811;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 10px 30px rgba(0,0,0,.4);
     }
   }
   * { box-sizing: border-box; }
@@ -46,7 +46,7 @@
   .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; font-size: 15px; }
   .logo {
     width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
-    background: linear-gradient(135deg, #6b6bf0, #9b6bf0); color: #fff; font-size: 16px;
+    background: linear-gradient(135deg, #e08a63, #c15f3c); color: #fff; font-size: 16px;
   }
   .badge {
     font-size: 12px; color: var(--muted); background: var(--bg-soft);
@@ -68,17 +68,29 @@
   }
   .icon-btn:hover { background: var(--bg-soft); }
 
-  /* ── Options drawer ── */
+  /* ── Settings drawer ── */
   .options {
-    display: none; gap: 16px; align-items: center; flex-wrap: wrap;
-    padding: 12px 20px; border-bottom: 1px solid var(--border); background: var(--bg-soft);
+    display: none; padding: 16px 20px; border-bottom: 1px solid var(--border); background: var(--bg-soft);
   }
-  .options.open { display: flex; }
-  .options label { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
-  .options input[type=text] {
-    padding: 7px 11px; border: 1px solid var(--border); border-radius: 9px;
-    background: var(--panel); color: var(--text); font-size: 14px; min-width: 240px;
+  .options.open { display: block; }
+  .opt-grid { max-width: 760px; margin: 0 auto; display: grid; grid-template-columns: 1fr 1fr; gap: 14px 20px; }
+  .opt-field { display: flex; flex-direction: column; gap: 6px; }
+  .opt-field.opt-toggle { grid-column: 1 / -1; }
+  .opt-field > label { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  .opt-field.opt-toggle > label { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 14px; color: var(--text); display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .options input[type=text], .options input[type=password] {
+    padding: 9px 12px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--panel); color: var(--text); font-size: 14px; width: 100%;
   }
+  .options input:focus { outline: none; border-color: var(--accent); }
+  .key-row { display: flex; gap: 8px; }
+  .btn-small { border: none; background: var(--accent); color: #fff; border-radius: 10px; padding: 0 16px; font-weight: 600; font-size: 13px; cursor: pointer; }
+  .btn-small:hover { filter: brightness(1.05); }
+  .opt-hint { font-size: 12px; color: var(--muted); }
+  .opt-hint.ok { color: var(--ok); }
+  .opt-link { display: inline-block; margin-top: 14px; font-size: 13px; color: var(--accent); text-decoration: none; }
+  .opt-link:hover { text-decoration: underline; }
+  .options label { font-size: 13px; color: var(--muted); }
   .switch { position: relative; width: 38px; height: 22px; }
   .switch input { opacity: 0; width: 0; height: 0; }
   .slider {
@@ -97,7 +109,7 @@
 
   .welcome { text-align: center; padding: 56px 0 24px; color: var(--muted); }
   .welcome .logo { width: 52px; height: 52px; border-radius: 15px; font-size: 26px; margin: 0 auto 16px; }
-  .welcome h1 { font-size: 22px; color: var(--text); margin: 0 0 6px; font-weight: 650; }
+  .welcome h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 27px; color: var(--text); margin: 0 0 8px; font-weight: 600; letter-spacing: -0.01em; }
   .welcome p { margin: 0 auto; max-width: 440px; }
   .suggestions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; max-width: 540px; margin: 26px auto 0; }
   .suggestion {
@@ -113,7 +125,7 @@
     flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
     font-size: 15px; margin-top: 2px;
   }
-  .avatar.bot { background: linear-gradient(135deg, #6b6bf0, #9b6bf0); color: #fff; }
+  .avatar.bot { background: linear-gradient(135deg, #e08a63, #c15f3c); color: #fff; }
   .avatar.me { background: var(--bg-soft); border: 1px solid var(--border); }
   .turn-body { min-width: 0; max-width: 100%; }
 
@@ -238,9 +250,28 @@
 </header>
 
 <div class="options" id="options">
-  <label>Start URL <input type="text" id="url" placeholder="https://… (optional)" /></label>
-  <label><span class="switch"><input type="checkbox" id="auto" checked /><span class="slider"></span></span> Auto mode (don't ask before each action)</label>
-  <label><span class="switch"><input type="checkbox" id="cdp" /><span class="slider"></span></span> Use my main Chrome (CDP :9222)</label>
+  <div class="opt-grid">
+    <div class="opt-field">
+      <label for="apiKey">Groq API key</label>
+      <div class="key-row">
+        <input type="password" id="apiKey" placeholder="gsk_…  (leave blank to keep current)" autocomplete="off" />
+        <button class="btn-small" id="saveKey">Save</button>
+      </div>
+      <span class="opt-hint" id="keyHint"></span>
+    </div>
+    <div class="opt-field">
+      <label for="model">Model</label>
+      <input type="text" id="model" placeholder="openai/gpt-oss-120b" />
+    </div>
+    <div class="opt-field">
+      <label for="url">Start URL (optional)</label>
+      <input type="text" id="url" placeholder="https://…" />
+    </div>
+    <div class="opt-field opt-toggle">
+      <label><span class="switch"><input type="checkbox" id="auto" checked /><span class="slider"></span></span> Auto mode — run without asking before each action</label>
+    </div>
+  </div>
+  <a class="opt-link" href="https://console.groq.com/keys" target="_blank" rel="noopener">Get a free Groq key →</a>
 </div>
 
 <main id="main">
@@ -279,13 +310,32 @@ const thread = $('thread');
 const esc = (s) => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 let running = false, turn = null;
 
-// ── model badge ──
-fetch('/config').then(r => r.json()).then(c => {
-  $('modelBadge').textContent = `${c.provider} · ${c.model}`;
-}).catch(() => { $('modelBadge').textContent = 'offline'; });
+// ── model badge + settings ──
+function loadConfig() {
+  return fetch('/config').then(r => r.json()).then(c => {
+    $('modelBadge').textContent = `${c.provider} · ${c.model}`;
+    $('model').value = c.model || '';
+    $('keyHint').textContent = c.hasKey ? '✓ A key is set (leave blank to keep it)' : 'No key set — paste your Groq key';
+    $('keyHint').className = 'opt-hint' + (c.hasKey ? ' ok' : '');
+    return c;
+  }).catch(() => { $('modelBadge').textContent = 'offline'; });
+}
+loadConfig();
 
-// ── options drawer ──
+// ── settings drawer ──
 $('gear').onclick = () => $('options').classList.toggle('open');
+$('saveKey').onclick = async () => {
+  const apiKey = $('apiKey').value.trim();
+  const model = $('model').value.trim();
+  $('saveKey').textContent = 'Saving…'; $('saveKey').disabled = true;
+  try {
+    await fetch('/settings', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ apiKey, model }) });
+    $('apiKey').value = '';
+    await loadConfig();
+    $('keyHint').textContent = '✓ Saved'; $('keyHint').className = 'opt-hint ok';
+  } catch { $('keyHint').textContent = 'Could not save'; }
+  $('saveKey').textContent = 'Save'; $('saveKey').disabled = false;
+};
 
 // ── status ──
 function setStatus(state, text) {
@@ -497,7 +547,7 @@ async function run() {
       task,
       startUrl: $('url').value.trim() || undefined,
       auto: $('auto').checked,
-      mode: $('cdp').checked ? 'cdp' : 'profile',
+      mode: 'profile',
     }),
   });
   if (!res.ok) {
