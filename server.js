@@ -69,6 +69,9 @@ app.post('/control', (req, res) => {
   } else if (command === 'reject') {
     session.pendingConfirm?.resolve(false);
     session.pendingConfirm = null;
+  } else if (command === 'continue') {
+    // user finished signing in / solving a wall
+    session.signal.continueLogin = true;
   }
   res.json({ ok: true });
 });
@@ -123,9 +126,10 @@ app.post('/run', async (req, res) => {
     let text = err.message;
     if (mode === 'cdp' && /ECONNREFUSED|9222/.test(text)) {
       text =
-        'Could not reach Chrome on port 9222. "Use my main Chrome" (CDP) needs Chrome started ' +
-        'with --remote-debugging-port=9222 first. Easiest fix: uncheck that box to use the ' +
-        'dedicated profile instead.';
+        'CDP could not reach Chrome on port 9222 — and on Chrome 136+ it cannot use your ' +
+        'main profile\'s logins anyway (Google blocks it). To be logged in: UNCHECK "Use my ' +
+        'main Chrome", then either sign in once when the agent prompts you, or quit Chrome and ' +
+        'run "npm run import-profile" to copy your sessions into the agent.';
     }
     broadcast({ kind: 'error', text });
   } finally {

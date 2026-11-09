@@ -43,6 +43,48 @@ function parseAction(raw) {
   return obj.action ? obj : { thought: '', action: obj };
 }
 
+// Detect a sign-in wall so we can hand off to the human to log in (once).
+async function needsLogin(page) {
+  try {
+    return await page.evaluate(() => {
+      const hasPwd = !!document.querySelector(
+        'input[type="password"]:not([type="hidden"]):not([aria-hidden="true"])'
+      );
+      const url = location.href.toLowerCase();
+      const authUrl =
+        /accounts\.google\.com|appleid\.apple\.com|login\.|\/login|\/signin|\/sign-in|\/sign_in|\/auth\/|\/sessions\/new|\/oauth/.test(
+          url
+        );
+      const t = (document.title + ' ' + (document.body?.innerText || '').slice(0, 1200)).toLowerCase();
+      const loginish =
+        /sign in|log in|sign-in|log-in|continue with google|continue with apple|enter your password|choose an account/.test(
+          t
+        );
+      // A visible password box is the strongest signal; otherwise an auth URL
+      // that also reads like a login page.
+      return hasPwd || (authUrl && loginish);
+    });
+  } catch {
+    return false;
+  }
+}
+
+// Wait for the human to sign in: resolve when they click "continue", when the
+// login page goes away on its own (they signed in), on stop, or on timeout.
+async function waitForLogin(getPage, signal, maxMs) {
+  const start = Date.now();
+  while (Date.now() - start < maxMs) {
+    if (signal?.stopped) return false;
+    if (signal?.continueLogin) {
+      signal.continueLogin = false;
+      return true;
+    }
+    await getPage().waitForTimeout(2500).catch(() => {});
+    if (!(await needsLogin(getPage()))) return true;
+  }
+  return false;
+}
+
 // Detect CAPTCHA / "unusual traffic" bot-walls so we can hand off to the human.
 async function botWall(page) {
   const url = page.url().toLowerCase();
@@ -104,6 +146,24 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
       emit({ kind: 'activity', step, phase: 'reading', text: solved ? 'Verification cleared — continuing…' : 'Still blocked.' });
       if (!solved)
         return 'A verification/CAPTCHA page is blocking automation and was not solved in time. Tip: I avoid Google search for this reason — try again, or give a direct Start URL (e.g. youtube.com).';
+      page = activePage(context, page);
+    }
+
+    // If a sign-in wall appears, pause and let the user log in (once) in the
+    // open window. The session is saved in the profile and reused next time.
+    if (await needsLogin(page)) {
+      emit({
+        kind: 'login',
+        step,
+        text:
+          'This site needs you to sign in. Please log in in the Chrome window (you can use "Sign in with Google"), then click "I\'ve signed in". Your session is saved for next time.',
+      });
+      const ok = await waitForLogin(() => (page = activePage(context, page)), signal, 300000);
+      emit({ kind: 'activity', step, phase: 'reading', text: ok ? 'Signed in — continuing…' : 'Sign-in not completed.' });
+      if (!ok)
+        return 'This site needs sign-in and it was not completed. Log in once in the open Chrome window, then re-run — the session will be saved and reused.';
+      page = activePage(context, page);
+      await page.bringToFront().catch(() => {});
     }
 
     // Break out of pointless repetition (e.g. clicking a link that does nothing).

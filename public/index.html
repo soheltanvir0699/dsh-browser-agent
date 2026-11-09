@@ -363,6 +363,16 @@ function render(ev) {
       turn.live.before(c); scrollDown();
       break;
     }
+    case 'login': {
+      liveText('🔑 Waiting for you to sign in…');
+      const c = document.createElement('div');
+      c.className = 'confirm';
+      c.innerHTML = `<div class="t">🔑 Sign-in needed</div><div>${esc(ev.text)}</div>
+        <div class="confirm-btns"><button class="primary">I've signed in — continue</button></div>`;
+      c.querySelector('button').onclick = (e) => { control('continue'); e.target.disabled = true; e.target.textContent = 'Continuing…'; };
+      turn.live.before(c); scrollDown();
+      break;
+    }
     case 'finished':
       finishTurn();
       addAnswer(ev.answer);
