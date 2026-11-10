@@ -1,78 +1,86 @@
 /**
  * Minimal OpenAI-compatible chat client (DeepSeek / Groq / Gemini / Ollama…).
- * Uses the global fetch in Node 18+. No SDK dependency.
  *
- * Resilience built in:
- *  - If strict JSON mode is rejected or fails validation (Groq's gpt-oss can
- *    return json_validate_failed with an empty generation), retry WITHOUT JSON
- *    mode — the caller's prompt already demands JSON and the parser is tolerant.
- *  - If the model returns empty content under JSON mode, retry without it.
- *  - Back off and retry on 429 rate limits.
+ * IMPORTANT: this uses node:https directly instead of the global `fetch`.
+ * Node's `fetch` (undici) shares a connection pool that Playwright can leave in
+ * a bad state, which made model calls HANG indefinitely while a browser was
+ * open. A plain https request uses its own socket + a real socket timeout, so a
+ * stalled model call can never freeze a task.
+ *
+ * Resilience: retry without strict JSON mode when a backend rejects it; retry on
+ * 429; salvage the model's output from `failed_generation`; time out at 50s.
  */
+import https from 'node:https';
+import http from 'node:http';
+
+function postJSON(urlStr, headers, bodyObj, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    let u;
+    try { u = new URL(urlStr); } catch (e) { return reject(e); }
+    const lib = u.protocol === 'http:' ? http : https;
+    const body = JSON.stringify(bodyObj);
+    const req = lib.request(
+      {
+        hostname: u.hostname,
+        port: u.port || (u.protocol === 'http:' ? 80 : 443),
+        path: u.pathname + u.search,
+        method: 'POST',
+        headers: { ...headers, 'Content-Length': Buffer.byteLength(body) },
+      },
+      (res) => {
+        let data = '';
+        res.setEncoding('utf8');
+        res.on('data', (c) => (data += c));
+        res.on('end', () => resolve({ status: res.statusCode || 0, text: data }));
+      }
+    );
+    req.on('error', reject);
+    req.setTimeout(timeoutMs, () => req.destroy(new Error('LLM request timed out')));
+    req.write(body);
+    req.end();
+  });
+}
 
 export async function chat({ baseUrl, apiKey, model, messages, jsonMode = true }) {
   const url = `${baseUrl.replace(/\/$/, '')}/chat/completions`;
-
-  const call = (useJson) => {
-    // Hard timeout so a hung request can never block a task forever.
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 45000);
-    return fetch(url, {
-      signal: ctrl.signal,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages,
-        temperature: 0,
-        // Reasoning models (gpt-oss) spend tokens thinking before the answer;
-        // without enough room the JSON gets cut off -> json_validate_failed.
-        max_tokens: 6000,
-        // Keep reasoning light so each step is fast (gpt-oss on Groq only).
-        ...(/gpt-oss/i.test(model) ? { reasoning_effort: process.env.LLM_REASONING || 'low' } : {}),
-        ...(useJson ? { response_format: { type: 'json_object' } } : {}),
-      }),
-    }).finally(() => clearTimeout(timer));
+  const headers = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+    Connection: 'close',
   };
+  const body = (useJson) => ({
+    model,
+    messages,
+    temperature: 0,
+    max_tokens: 6000,
+    ...(/gpt-oss/i.test(model) ? { reasoning_effort: process.env.LLM_REASONING || 'low' } : {}),
+    ...(useJson ? { response_format: { type: 'json_object' } } : {}),
+  });
+  const call = (useJson) => postJSON(url, headers, body(useJson), 50000);
 
-  // Matches the various ways a backend signals "JSON mode didn't work".
   const jsonModeTrouble = (txt) =>
-    /response_format|json_object|json[_ ]?validate|validate\s+json|failed_generation|adjust your prompt/i.test(
-      txt
-    );
+    /response_format|json_object|json[_ ]?validate|validate\s+json|failed_generation|adjust your prompt/i.test(txt);
 
   let res = await call(jsonMode);
 
-  // JSON mode rejected or failed validation — retry once in plain mode.
-  if (!res.ok && jsonMode) {
-    const peek = await res.clone().text().catch(() => '');
-    if ((res.status === 400 || res.status === 422) && jsonModeTrouble(peek)) {
-      res = await call(false);
-    }
+  // JSON mode rejected/failed — retry once without it.
+  if (res.status >= 400 && jsonMode && (res.status === 400 || res.status === 422) && jsonModeTrouble(res.text)) {
+    res = await call(false);
   }
 
-  // Rate limited (common on free tiers): back off and retry a couple of times.
-  for (let attempt = 0; res.status === 429 && attempt < 3; attempt++) {
-    const retryAfter = Number(res.headers.get('retry-after'));
-    const waitMs = Number.isFinite(retryAfter) && retryAfter > 0 ? retryAfter * 1000 : (attempt + 1) * 4000;
-    await new Promise((r) => setTimeout(r, waitMs));
+  // Rate limited — back off and retry a couple of times.
+  for (let attempt = 0; res.status === 429 && attempt < 2; attempt++) {
+    await new Promise((r) => setTimeout(r, (attempt + 1) * 3000));
     res = await call(jsonMode);
   }
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    // Salvage: gpt-oss sometimes emits a bogus tool call / malformed JSON, and
-    // Groq returns 400 but includes the model's intended output in
-    // `failed_generation`. Recover it so the task continues.
+  if (res.status >= 400) {
+    // Salvage the model's intended output from `failed_generation` (tool_use_failed, etc.).
     try {
-      const fg = JSON.parse(body)?.error?.failed_generation;
+      const fg = JSON.parse(res.text)?.error?.failed_generation;
       if (fg && String(fg).trim()) {
         try {
           const obj = JSON.parse(fg);
-          // tool-call shape: {"name":"...","arguments":{thought,action}}
           if (obj && obj.arguments) return JSON.stringify(obj.arguments);
         } catch {}
         return String(fg);
@@ -80,18 +88,17 @@ export async function chat({ baseUrl, apiKey, model, messages, jsonMode = true }
     } catch {}
     if (res.status === 429)
       throw new Error('Rate limit reached on the free tier. Wait a minute and try again, or switch model/provider in .env.');
-    throw new Error(`LLM API ${res.status}: ${body.slice(0, 400)}`);
+    throw new Error(`LLM API ${res.status}: ${String(res.text).slice(0, 400)}`);
   }
 
-  let data = await res.json();
-  let content = data.choices?.[0]?.message?.content ?? '';
+  let content = '';
+  try { content = JSON.parse(res.text).choices?.[0]?.message?.content ?? ''; } catch {}
 
-  // Empty generation under JSON mode (gpt-oss sometimes does this) — retry plain.
+  // Empty generation under JSON mode — retry once without it.
   if ((!content || !content.trim()) && jsonMode) {
-    const res2 = await call(false);
-    if (res2.ok) {
-      data = await res2.json();
-      content = data.choices?.[0]?.message?.content ?? content;
+    const r2 = await call(false);
+    if (r2.status < 400) {
+      try { content = JSON.parse(r2.text).choices?.[0]?.message?.content ?? content; } catch {}
     }
   }
 
