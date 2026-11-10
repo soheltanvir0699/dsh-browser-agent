@@ -443,7 +443,7 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
       lastDesc = describeAction(action);
       if (skips >= 3) {
         emit({ kind: 'result', step, ok: false, text: 'no approach is making progress — stopping' });
-        return "I couldn't make progress on this page — the control I needed didn't respond. Try giving me a direct Start URL for the exact page, or rephrase the task. (Note: app download counts are often only shown as ranges, or only to the app's owner.)";
+        return "I couldn't make progress on this page — the control I needed didn't respond to automation. Try giving me a direct Start URL for the exact page, or rephrase the task into a smaller step.";
       }
       continue;
     }

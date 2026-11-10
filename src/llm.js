@@ -64,6 +64,20 @@ export async function chat({ baseUrl, apiKey, model, messages, jsonMode = true }
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
+    // Salvage: gpt-oss sometimes emits a bogus tool call / malformed JSON, and
+    // Groq returns 400 but includes the model's intended output in
+    // `failed_generation`. Recover it so the task continues.
+    try {
+      const fg = JSON.parse(body)?.error?.failed_generation;
+      if (fg && String(fg).trim()) {
+        try {
+          const obj = JSON.parse(fg);
+          // tool-call shape: {"name":"...","arguments":{thought,action}}
+          if (obj && obj.arguments) return JSON.stringify(obj.arguments);
+        } catch {}
+        return String(fg);
+      }
+    } catch {}
     if (res.status === 429)
       throw new Error('Rate limit reached on the free tier. Wait a minute and try again, or switch model/provider in .env.');
     throw new Error(`LLM API ${res.status}: ${body.slice(0, 400)}`);
