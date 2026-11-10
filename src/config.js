@@ -17,6 +17,9 @@ export function loadConfig() {
   // answer in prose. We keep it off and parse tolerantly instead. Set
   // LLM_JSON_MODE=true only for providers where it helps (e.g. DeepSeek).
   const jsonMode = (process.env.LLM_JSON_MODE ?? 'false') === 'true';
+  // Run the browser invisibly (no window). Logins/CAPTCHAs can't be solved in
+  // headless, so it suits already-logged-in profiles (e.g. after import-profile).
+  const headless = (process.env.HEADLESS ?? 'false') === 'true';
 
   // Optional VISION model, used only when the agent gets stuck: it screenshots
   // the page and asks a vision model what to do next. Needs a vision-capable
@@ -33,5 +36,5 @@ export function loadConfig() {
     ? { apiKey, baseUrl, model }
     : null;
 
-  return { apiKey, baseUrl, model, jsonMode, vision };
+  return { apiKey, baseUrl, model, jsonMode, headless, vision };
 }

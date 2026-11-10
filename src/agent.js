@@ -165,7 +165,7 @@ function activePage(context, fallback) {
   return (real.length ? real : open).at(-1) || fallback;
 }
 
-export async function runAgent({ page, context, task, cfg, maxSteps = 25, confirm, onStep, signal }) {
+export async function runAgent({ page, context, task, cfg, maxSteps = 25, confirm, onStep, signal, headless = false }) {
   const emit = (ev) => { try { onStep?.(ev); } catch {} };
   const history = []; // compact log of what was done, kept small to save tokens
   const executed = []; // signatures of actions taken, for loop detection
@@ -191,6 +191,8 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
     // If a CAPTCHA / "unusual traffic" wall appears, hand off to the human,
     // then re-observe the page they land on.
     if (await botWall(page)) {
+      if (headless)
+        return 'A CAPTCHA / verification page appeared, but the browser is running headless (no window to solve it in). Turn off headless mode and try again.';
       emit({
         kind: 'captcha',
         step,
@@ -208,6 +210,8 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
     // If a sign-in wall appears, PAUSE (keep the browser open) and let the user
     // log in once. The session is saved in the profile and reused next time.
     if (await needsLogin(page)) {
+      if (headless)
+        return 'This site needs sign-in, but the browser is running headless (no window to log in). Either turn off headless mode to sign in once, or run `npm run import-profile` (with Chrome closed) to bring in your existing logins, then try again.';
       emit({
         kind: 'login',
         step,

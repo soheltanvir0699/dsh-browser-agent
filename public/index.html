@@ -283,6 +283,9 @@
     <div class="opt-field opt-toggle">
       <label><span class="switch"><input type="checkbox" id="auto" checked /><span class="slider"></span></span> Auto mode — run without asking before each action</label>
     </div>
+    <div class="opt-field opt-toggle">
+      <label><span class="switch"><input type="checkbox" id="headless" /><span class="slider"></span></span> Headless — run in the background (no visible window; sites needing sign-in won't work unless your profile is imported)</label>
+    </div>
   </div>
   <a class="opt-link" href="https://console.groq.com/keys" target="_blank" rel="noopener">Get a free Groq key →</a>
 </div>
@@ -587,6 +590,7 @@ async function run() {
       task,
       startUrl: $('url').value.trim() || undefined,
       auto: $('auto').checked,
+      headless: $('headless').checked,
       mode: 'profile',
     }),
   });

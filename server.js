@@ -108,8 +108,9 @@ app.post('/run', async (req, res) => {
   if (session.running) return res.status(409).json({ error: 'a task is already running' });
   if (!cfg.apiKey) return res.status(400).json({ error: 'DEEPSEEK_API_KEY not set in .env' });
 
-  const { task, startUrl, mode = 'profile', auto = false } = req.body || {};
+  const { task, startUrl, mode = 'profile', auto = false, headless } = req.body || {};
   if (!task || !task.trim()) return res.status(400).json({ error: 'task is required' });
+  const useHeadless = headless === undefined ? cfg.headless : !!headless;
 
   session.running = true;
   session.signal = { stopped: false };
@@ -130,7 +131,7 @@ app.post('/run', async (req, res) => {
         ? await connectCDP()
         : await launchProfile({
             profileDir: process.env.AGENT_PROFILE_DIR || './.agent-profile',
-            headless: false,
+            headless: useHeadless,
           });
 
     const page = session.browser.page;
@@ -147,6 +148,7 @@ app.post('/run', async (req, res) => {
       confirm,
       signal: session.signal,
       onStep: broadcast,
+      headless: useHeadless,
     });
     broadcast({ kind: 'finished', answer });
   } catch (err) {

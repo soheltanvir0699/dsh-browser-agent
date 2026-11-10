@@ -7,11 +7,12 @@ import { runAgent } from './src/agent.js';
 import { loadConfig } from './src/config.js';
 
 function parseArgs(argv) {
-  const args = { mode: 'profile', auto: false, task: null, startUrl: null };
+  const args = { mode: 'profile', auto: false, task: null, startUrl: null, headless: undefined };
   for (let i = 2; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--cdp') args.mode = 'cdp';
     else if (a === '--auto') args.auto = true;
+    else if (a === '--headless') args.headless = true;
     else if (a === '--url') args.startUrl = argv[++i];
     else if (a === '--task') args.task = argv[++i];
     else if (!args.task) args.task = a;
@@ -29,10 +30,11 @@ async function main() {
   let task = args.task;
   if (!task) task = await rl.question('Task: ');
 
+  const useHeadless = args.headless === undefined ? cfg.headless : args.headless;
   const { page, context, close } =
     args.mode === 'cdp'
       ? await connectCDP()
-      : await launchProfile({ profileDir: process.env.AGENT_PROFILE_DIR || './.agent-profile' });
+      : await launchProfile({ profileDir: process.env.AGENT_PROFILE_DIR || './.agent-profile', headless: useHeadless });
 
   if (args.startUrl) {
     await page.goto(args.startUrl, { waitUntil: 'domcontentloaded' });
@@ -52,7 +54,7 @@ async function main() {
       };
 
   try {
-    const answer = await runAgent({ page, context, task, cfg, confirm });
+    const answer = await runAgent({ page, context, task, cfg, confirm, headless: useHeadless });
     console.log(`\n=== RESULT ===\n${answer}\n`);
   } catch (err) {
     console.error(`\nAgent stopped: ${err.message}`);
