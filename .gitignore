@@ -3,3 +3,7 @@ node_modules/
 .agent-profile/
 *.log
 .DS_Store
+
+# Encrypted credential vault (never commit)
+.scout-vault.json
+.scout-vault.key

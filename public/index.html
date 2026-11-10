@@ -215,7 +215,13 @@
   .confirm { border: 1px solid var(--warn); background: var(--warn-soft); border-radius: 14px; padding: 12px 15px; margin-top: 8px; }
   .confirm .t { font-size: 13px; color: var(--warn); font-weight: 600; margin-bottom: 8px; }
   .confirm .chip { color: var(--warn); background: #fff6; }
-  .confirm-btns { display: flex; gap: 8px; margin-top: 10px; }
+  .confirm-btns { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .cred-form { display: flex; flex-direction: column; gap: 7px; margin-top: 10px; }
+  .cred-form input[type=text], .cred-form input[type=password] {
+    padding: 8px 11px; border: 1px solid var(--border); border-radius: 9px;
+    background: var(--panel); color: var(--text); font-size: 14px; }
+  .cred-form input:focus { outline: none; border-color: var(--accent); }
+  .cred-save { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); }
 
   /* ── Composer ── */
   .composer-wrap { border-top: 1px solid var(--border); background: var(--panel); padding: 12px 20px 16px; }
@@ -488,9 +494,27 @@ function render(ev) {
       liveText('🔑 Waiting for you to sign in…');
       const c = document.createElement('div');
       c.className = 'confirm';
-      c.innerHTML = `<div class="t">🔑 Sign-in needed</div><div>${esc(ev.text)}</div>
-        <div class="confirm-btns"><button class="primary">I've signed in — continue</button></div>`;
-      c.querySelector('button').onclick = (e) => { control('continue'); e.target.disabled = true; e.target.textContent = 'Continuing…'; };
+      c.innerHTML = `<div class="t">🔑 Sign-in needed${ev.domain ? ' — ' + esc(ev.domain) : ''}</div>
+        <div>${esc(ev.text)}</div>
+        <div class="cred-form">
+          <input type="text" class="cred-email" placeholder="email / username" autocomplete="off" />
+          <input type="password" class="cred-pass" placeholder="password" autocomplete="off" />
+          <label class="cred-save"><input type="checkbox" class="cred-savebox" checked /> Save (encrypted) for next time</label>
+        </div>
+        <div class="confirm-btns">
+          <button class="primary cred-fill">Auto-fill & sign in</button>
+          <button class="ghost cred-manual">I'll sign in myself — continue</button>
+        </div>`;
+      const email = c.querySelector('.cred-email');
+      const pass = c.querySelector('.cred-pass');
+      c.querySelector('.cred-fill').onclick = async (e) => {
+        if (!email.value || !pass.value) { email.focus(); return; }
+        e.target.disabled = true; e.target.textContent = 'Signing in…';
+        await fetch('/credentials', { method: 'POST', headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({ email: email.value, password: pass.value, save: c.querySelector('.cred-savebox').checked }) });
+        pass.value = '';
+      };
+      c.querySelector('.cred-manual').onclick = (e) => { control('continue'); e.target.disabled = true; e.target.textContent = 'Continuing…'; };
       turn.live.before(c); scrollDown();
       break;
     }

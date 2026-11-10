@@ -1,6 +1,54 @@
 import { observe, renderObservation, annotatedScreenshot } from './observe.js';
 import { runAction } from './actions.js';
 import { chat } from './llm.js';
+import { getCred, saveCred, domainOf } from './vault.js';
+
+// Click a "Next / Continue / Sign in" style button if there is one.
+async function clickNext(page) {
+  const btn = page
+    .locator(
+      '#identifierNext, #passwordNext, button:has-text("Next"), button:has-text("Continue"), ' +
+        'button:has-text("Sign in"), button:has-text("Log in"), button:has-text("Sign In"), ' +
+        'button[type="submit"], input[type="submit"]'
+    )
+    .first();
+  if ((await btn.count()) > 0) {
+    await btn.click({ timeout: 5000 }).catch(() => {});
+    return true;
+  }
+  return false;
+}
+
+// Fill in email + password and submit. Handles one-page and two-step (Google-
+// style: email → Next → password → Next) forms. Returns after submitting.
+async function autoLogin(page, { email, password }) {
+  const emailSel =
+    'input[type="email"], input[name="identifier"], input[autocomplete="username"], ' +
+    'input[name="username"], input[id="username"], input[name*="email" i], input[id*="email" i]';
+  const passSel = 'input[type="password"]:not([aria-hidden="true"])';
+  try {
+    const emailField = page.locator(emailSel).first();
+    if ((await emailField.count()) > 0 && (await emailField.isVisible().catch(() => false))) {
+      await emailField.fill(email, { timeout: 8000 });
+      const pass = page.locator(passSel).first();
+      if (!(await pass.isVisible().catch(() => false))) {
+        await clickNext(page);
+        await page.waitForLoadState('domcontentloaded', { timeout: 6000 }).catch(() => {});
+        await page.waitForTimeout(1800);
+      }
+    }
+    const passField = page.locator(passSel).first();
+    if ((await passField.count()) > 0 && (await passField.isVisible().catch(() => false))) {
+      await passField.fill(password, { timeout: 8000 });
+      if (!(await clickNext(page))) await passField.press('Enter').catch(() => {});
+      await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
+      await page.waitForTimeout(2800);
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const SYSTEM_PROMPT = `You are a browser agent. You control a real web browser to complete the user's task.
 
@@ -111,12 +159,18 @@ async function needsLogin(page) {
   }
 }
 
-// Wait for the human to sign in: resolve when they click "continue", when the
-// login page goes away on its own (they signed in), on stop, or on timeout.
-async function waitForLogin(getPage, signal, maxMs) {
+// Wait for sign-in to complete: resolve when the user clicks "continue", when
+// the login page goes away on its own, or when the user submits credentials
+// (we auto-fill them, and save them if asked). Stop/timeout return false.
+async function waitForLogin(getPage, signal, maxMs, onCreds) {
   const start = Date.now();
   while (Date.now() - start < maxMs) {
     if (signal?.stopped) return false;
+    if (signal?.credentials) {
+      const c = signal.credentials;
+      signal.credentials = null;
+      await onCreds?.(c);
+    }
     if (signal?.continueLogin) {
       signal.continueLogin = false;
       return true;
@@ -207,21 +261,45 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
       obs = await observe(page);
     }
 
-    // If a sign-in wall appears, PAUSE (keep the browser open) and let the user
-    // log in once. The session is saved in the profile and reused next time.
+    // If a sign-in wall appears: try SAVED credentials first; otherwise ask the
+    // user for them (auto-fill + optionally save) or let them sign in manually.
     if (await needsLogin(page)) {
-      if (headless)
-        return 'This site needs sign-in, but the browser is running headless (no window to log in). Either turn off headless mode to sign in once, or run `npm run import-profile` (with Chrome closed) to bring in your existing logins, then try again.';
-      emit({
-        kind: 'login',
-        step,
-        text:
-          'This site needs you to sign in. Please log in in the Chrome window (use your normal account or "Sign in with Google"), then click "I\'ve signed in". Your session is saved for next time.',
-      });
-      const ok = await waitForLogin(() => (page = activePage(context, page)), signal, 300000);
-      emit({ kind: 'activity', step, phase: 'reading', text: ok ? 'Signed in — continuing…' : 'Sign-in not completed.' });
-      if (!ok)
-        return 'This site needs sign-in and it was not completed. Log in once in the open Chrome window, then re-run — the session will be saved and reused. (Or run `npm run import-profile` to bring in your existing Chrome logins.)';
+      const domain = domainOf(page.url());
+
+      // 1) Auto-login with saved credentials for this site, if we have them.
+      const saved = getCred(domain);
+      if (saved) {
+        emit({ kind: 'activity', step, phase: 'acting', text: `Signing in to ${domain} with saved login…` });
+        await autoLogin(page, saved);
+        page = activePage(context, page);
+      }
+
+      // 2) Still on a login page? Hand off — collect credentials or sign in manually.
+      if (await needsLogin(page)) {
+        if (headless)
+          return `${domain} needs sign-in and the saved login didn't get through (often 2FA). Run with Headless OFF once to finish signing in; the session is then saved for headless next time.`;
+        emit({
+          kind: 'login',
+          step,
+          domain,
+          text:
+            `${domain} needs sign-in. Enter your email + password below to auto-fill (optionally save for next time), ` +
+            `or sign in yourself in the Chrome window and click "I've signed in". Any 2FA/verification must be done by you in the window.`,
+        });
+        const ok = await waitForLogin(
+          () => (page = activePage(context, page)),
+          signal,
+          300000,
+          async ({ email, password, save }) => {
+            emit({ kind: 'activity', step, phase: 'acting', text: `Filling in the login for ${domain}…` });
+            await autoLogin(activePage(context, page), { email, password });
+            if (save && email && password) saveCred(domain, email, password);
+          }
+        );
+        emit({ kind: 'activity', step, phase: 'reading', text: ok ? 'Signed in — continuing…' : 'Sign-in not completed.' });
+        if (!ok)
+          return 'This site needs sign-in and it was not completed. Sign in once in the open window (finish any 2FA) — it is then saved for next time.';
+      }
       page = activePage(context, page);
       await page.bringToFront().catch(() => {});
       obs = await observe(page);

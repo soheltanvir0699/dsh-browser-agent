@@ -103,6 +103,15 @@ app.post('/control', (req, res) => {
   res.json({ ok: true });
 });
 
+// Receive login credentials from the UI (used to auto-fill a sign-in form).
+// Stored only in memory here; the vault (if save=true) encrypts them on disk.
+app.post('/credentials', (req, res) => {
+  const { email, password, save } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'email and password required' });
+  session.signal.credentials = { email, password, save: !!save };
+  res.json({ ok: true });
+});
+
 // Start a task
 app.post('/run', async (req, res) => {
   if (session.running) return res.status(409).json({ error: 'a task is already running' });
