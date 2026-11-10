@@ -19,30 +19,45 @@ async function clickNext(page) {
   return false;
 }
 
-// Fill in email + password and submit. Handles one-page and two-step (Google-
-// style: email → Next → password → Next) forms. Returns after submitting.
-async function autoLogin(page, { email, password }) {
+// Fill in email + password. With submit:false (default) it ONLY fills — the
+// user clicks Sign in. For a two-step form (email → Next → password) in
+// fill-only mode, it fills the email, then waits for YOU to click Next and
+// fills the password when it appears. With submit:true it also clicks through.
+async function autoLogin(page, { email, password }, { submit = false } = {}) {
   const emailSel =
     'input[type="email"], input[name="identifier"], input[autocomplete="username"], ' +
-    'input[name="username"], input[id="username"], input[name*="email" i], input[id*="email" i]';
+    'input[name="username"], input[id="username"], input[name="login"], input[id*="login" i], ' +
+    'input[name="user"], input[name*="email" i], input[id*="email" i], ' +
+    'input[placeholder*="email" i], input[placeholder*="username" i], input[placeholder*="phone" i]';
   const passSel = 'input[type="password"]:not([aria-hidden="true"])';
+  const passVisible = async () => {
+    const f = page.locator(passSel).first();
+    return (await f.count()) > 0 && (await f.isVisible().catch(() => false)) ? f : null;
+  };
   try {
     const emailField = page.locator(emailSel).first();
     if ((await emailField.count()) > 0 && (await emailField.isVisible().catch(() => false))) {
       await emailField.fill(email, { timeout: 8000 });
-      const pass = page.locator(passSel).first();
-      if (!(await pass.isVisible().catch(() => false))) {
+      if (submit && !(await passVisible())) {
         await clickNext(page);
-        await page.waitForLoadState('domcontentloaded', { timeout: 6000 }).catch(() => {});
         await page.waitForTimeout(1800);
       }
     }
-    const passField = page.locator(passSel).first();
-    if ((await passField.count()) > 0 && (await passField.isVisible().catch(() => false))) {
-      await passField.fill(password, { timeout: 8000 });
-      if (!(await clickNext(page))) await passField.press('Enter').catch(() => {});
-      await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
-      await page.waitForTimeout(2800);
+    // Get the password field — waiting for the user to advance in fill-only mode.
+    let pf = await passVisible();
+    if (!pf && !submit) {
+      for (let i = 0; i < 24 && !pf; i++) {
+        await page.waitForTimeout(2500);
+        pf = await passVisible();
+      }
+    }
+    if (pf) {
+      await pf.fill(password, { timeout: 8000 });
+      if (submit) {
+        if (!(await clickNext(page))) await pf.press('Enter').catch(() => {});
+        await page.waitForLoadState('domcontentloaded', { timeout: 8000 }).catch(() => {});
+        await page.waitForTimeout(2800);
+      }
     }
     return true;
   } catch {
@@ -269,8 +284,8 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
       // 1) Auto-login with saved credentials for this site, if we have them.
       const saved = getCred(domain);
       if (saved) {
-        emit({ kind: 'activity', step, phase: 'acting', text: `Signing in to ${domain} with saved login…` });
-        await autoLogin(page, saved);
+        emit({ kind: 'activity', step, phase: 'acting', text: `Filling saved login for ${domain}…` });
+        await autoLogin(page, saved, { submit: false }); // fill only — you click Sign in
         page = activePage(context, page);
       }
 
@@ -283,16 +298,16 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
           step,
           domain,
           text:
-            `${domain} needs sign-in. Enter your email + password below to auto-fill (optionally save for next time), ` +
-            `or sign in yourself in the Chrome window and click "I've signed in". Any 2FA/verification must be done by you in the window.`,
+            `${domain} needs sign-in. Enter your email + password below and I'll FILL the fields — then YOU click the Sign in button in the Chrome window. ` +
+            `(For a two-step form, click Next after I fill the email and I'll fill the password.) Finish any 2FA yourself.`,
         });
         const ok = await waitForLogin(
           () => (page = activePage(context, page)),
           signal,
           300000,
           async ({ email, password, save }) => {
-            emit({ kind: 'activity', step, phase: 'acting', text: `Filling in the login for ${domain}…` });
-            await autoLogin(activePage(context, page), { email, password });
+            emit({ kind: 'activity', step, phase: 'acting', text: `Filling the login fields for ${domain} — now click Sign in…` });
+            await autoLogin(activePage(context, page), { email, password }, { submit: false });
             if (save && email && password) saveCred(domain, email, password);
           }
         );

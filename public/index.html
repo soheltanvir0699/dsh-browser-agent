@@ -502,14 +502,14 @@ function render(ev) {
           <label class="cred-save"><input type="checkbox" class="cred-savebox" checked /> Save (encrypted) for next time</label>
         </div>
         <div class="confirm-btns">
-          <button class="primary cred-fill">Auto-fill & sign in</button>
-          <button class="ghost cred-manual">I'll sign in myself — continue</button>
+          <button class="primary cred-fill">Fill the fields (I'll click Sign in)</button>
+          <button class="ghost cred-manual">I'll type it myself — continue</button>
         </div>`;
       const email = c.querySelector('.cred-email');
       const pass = c.querySelector('.cred-pass');
       c.querySelector('.cred-fill').onclick = async (e) => {
         if (!email.value || !pass.value) { email.focus(); return; }
-        e.target.disabled = true; e.target.textContent = 'Signing in…';
+        e.target.disabled = true; e.target.textContent = 'Filling… now click Sign in in the window';
         await fetch('/credentials', { method: 'POST', headers: {'Content-Type':'application/json'},
           body: JSON.stringify({ email: email.value, password: pass.value, save: c.querySelector('.cred-savebox').checked }) });
         pass.value = '';
