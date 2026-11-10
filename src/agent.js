@@ -99,11 +99,16 @@ Interacting with complex pages (this is how you avoid getting stuck):
 - Date pickers and multi-field forms: if you can't set a field within 2 tries, continue with what is shown or report the best answer visible. Never loop on the same widget.
 - You have limited steps — when you have enough information to answer, STOP and use "done".
 
-Writing the final answer (the "done" answer):
-- Give a COMPLETE, well-organized answer, not a one-line reply. Include the concrete details you saw on the page: names, numbers, dates, prices, ratings, authors, key points, and a source URL.
-- Format with Markdown so it reads well (it is rendered richly): a short intro line, "## headings" to group sections, "- " bullets for lists, "**bold**" for labels, Markdown tables when comparing rows of data, and [text](url) links.
-- If the user said "open X", briefly say what the page is, then the specific information they wanted.
-- Only include what you actually saw on the page — never invent details. If something wasn't available, say so.`;
+Writing the final answer (the "done" answer) — BE AS DETAILED AS POSSIBLE:
+- Give a thorough, well-organized answer. For EACH item include EVERY detail available on the page, not just the basics. Examples of details to capture when present:
+    • the item's link/URL and its source domain
+    • all counts: points/upvotes, number of comments, ratings, reviews, views, stars, price
+    • author/poster, date/time, category/tags, status
+    • a 1-2 sentence description of what each item is about (from the title/snippet)
+- Prefer a Markdown TABLE with many columns (e.g. Rank | Title (linked) | Points | Comments | Author | Time | Source) and add a short notes list under it for extra context.
+- Use "## headings", "**bold**" labels, "- " bullets, and [text](url) links. Make titles clickable links to their URLs.
+- If the user asks for "details" and there are only a few items, you MAY open an item or its comments to add a short summary — but always include the on-page details first, and don't waste many steps.
+- Only include what you actually saw — never invent. If a detail wasn't available, omit it or say "n/a".`;
 
 function describeAction(a) {
   switch (a.type) {
