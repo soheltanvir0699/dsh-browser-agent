@@ -83,6 +83,37 @@ export async function observe(page) {
   return { url, title, elements: data.elements, text: data.text };
 }
 
+// Draw numbered badges over each tagged element, screenshot, remove them.
+// Lets a vision model pick an element by its id ("set-of-marks" prompting).
+export async function annotatedScreenshot(page) {
+  await page
+    .evaluate(() => {
+      document.querySelectorAll('.__scout_mark__').forEach((e) => e.remove());
+      for (const el of document.querySelectorAll('[data-agent-id]')) {
+        const r = el.getBoundingClientRect();
+        if (r.width < 3 || r.height < 3 || r.bottom < 0 || r.top > innerHeight) continue;
+        const id = el.getAttribute('data-agent-id');
+        const box = document.createElement('div');
+        box.className = '__scout_mark__';
+        box.style.cssText = `position:fixed;left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px;border:1.5px solid #c15f3c;border-radius:3px;z-index:2147483647;pointer-events:none;box-sizing:border-box`;
+        const lab = document.createElement('div');
+        lab.className = '__scout_mark__';
+        lab.textContent = id;
+        lab.style.cssText = `position:fixed;left:${r.left}px;top:${Math.max(0, r.top - 13)}px;background:#c15f3c;color:#fff;font:bold 11px/1.2 sans-serif;padding:0 3px;border-radius:3px;z-index:2147483647;pointer-events:none`;
+        document.body.appendChild(box);
+        document.body.appendChild(lab);
+      }
+    })
+    .catch(() => {});
+  let b64 = '';
+  try {
+    const buf = await page.screenshot({ type: 'jpeg', quality: 55 });
+    b64 = buf.toString('base64');
+  } catch {}
+  await page.evaluate(() => document.querySelectorAll('.__scout_mark__').forEach((e) => e.remove())).catch(() => {});
+  return b64;
+}
+
 export function renderObservation({ url, title, elements, text }) {
   const lines = elements.map(
     (e) => `[${e.id}] <${e.tag}${e.role ? ` ${e.role}` : ''}>${e.vp ? '' : ' (scroll)'} ${e.text || '(no text)'}`

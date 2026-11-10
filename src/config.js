@@ -17,5 +17,21 @@ export function loadConfig() {
   // answer in prose. We keep it off and parse tolerantly instead. Set
   // LLM_JSON_MODE=true only for providers where it helps (e.g. DeepSeek).
   const jsonMode = (process.env.LLM_JSON_MODE ?? 'false') === 'true';
-  return { apiKey, baseUrl, model, jsonMode };
+
+  // Optional VISION model, used only when the agent gets stuck: it screenshots
+  // the page and asks a vision model what to do next. Needs a vision-capable
+  // model (Gemini free tier works; Groq gpt-oss does not). If VISION_API_KEY is
+  // unset, Scout reuses the main provider only if it already looks vision-capable.
+  const visionKey = process.env.VISION_API_KEY || '';
+  const visionBaseUrl =
+    process.env.VISION_BASE_URL || 'https://generativelanguage.googleapis.com/v1beta/openai';
+  const visionModel = process.env.VISION_MODEL || 'gemini-2.0-flash';
+  const mainIsVision = /gemini|gpt-4|llama-4|scout|maverick|vision|pixtral|qwen.*vl/i.test(model);
+  const vision = visionKey
+    ? { apiKey: visionKey, baseUrl: visionBaseUrl, model: visionModel }
+    : mainIsVision
+    ? { apiKey, baseUrl, model }
+    : null;
+
+  return { apiKey, baseUrl, model, jsonMode, vision };
 }

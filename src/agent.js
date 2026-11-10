@@ -1,4 +1,4 @@
-import { observe, renderObservation } from './observe.js';
+import { observe, renderObservation, annotatedScreenshot } from './observe.js';
 import { runAction } from './actions.js';
 import { chat } from './llm.js';
 
@@ -32,6 +32,7 @@ Interacting with complex pages (this is how you avoid getting stuck):
   Use "+" or %20 for spaces. This skips autocomplete, date pickers and dropdowns entirely.
 - Autocomplete / "search as you type" fields (locations, airports, products): type the text but do NOT set submit:true. Then WAIT one step and CLICK the matching option in the suggestion list. Pressing Enter on these often opens the wrong page.
 - If a click or type FAILS, or an element becomes invisible, do NOT try the same element again. Switch strategy immediately: a different element, scroll, or a direct results URL.
+- If typing in a search box doesn't show results, the page may be a landing page: click its main button first (e.g. "Check downloads", "Search", "Get started"), THEN use the search. Never type into the same box repeatedly.
 - Date pickers and multi-field forms: if you can't set a field within 2 tries, continue with what is shown or report the best answer visible. Never loop on the same widget.
 - You have limited steps — when you have enough information to answer, STOP and use "done".
 
@@ -168,6 +169,12 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
   const emit = (ev) => { try { onStep?.(ev); } catch {} };
   const history = []; // compact log of what was done, kept small to save tokens
   const executed = []; // signatures of actions taken, for loop detection
+  const ineffective = new Set(); // actions that changed nothing — never retry them
+  const deadDesc = new Set(); // human labels of dead actions, shown to the model
+  let lastSig = null; // signature of the last action we ran/skipped
+  let lastDesc = null; // label of the last action
+  let lastSnap = null; // page fingerprint after the last action
+  let skips = 0; // how many times we've blocked a no-op repeat
 
   for (let step = 1; step <= maxSteps; step++) {
     if (signal?.stopped) return 'stopped by user';
@@ -216,13 +223,12 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
       obs = await observe(page);
     }
 
-    // Break out of pointless repetition (e.g. clicking a link that does nothing).
-    const tail = executed.slice(-4);
-    if (tail.length === 4 && tail.every((s) => s === tail[0])) {
-      emit({ kind: 'result', step, ok: false, text: 'stuck repeating the same action — stopping' });
-      return "I got stuck repeating the same action with no progress. The link may open content I can't follow, or the task needs a different starting page. Try rephrasing or giving a direct Start URL.";
-    }
-    const stuck = executed.slice(-2).length === 2 && executed.at(-1) === executed.at(-2);
+    // Did the LAST action actually change the page? If not, remember it so we
+    // never waste steps repeating something that does nothing.
+    const snap = `${obs.url}|${obs.title}|${obs.elements.length}`;
+    const lastDidNothing = lastSig && snap === lastSnap;
+    if (lastDidNothing) { ineffective.add(lastSig); if (lastDesc) deadDesc.add(lastDesc); }
+    lastSnap = snap;
 
     emit({ kind: 'observation', step, url: obs.url, title: obs.title, count: obs.elements.length });
     const view = renderObservation(obs);
@@ -231,9 +237,13 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
     // history + only the CURRENT page. We never resend old page snapshots,
     // which keeps token usage flat and avoids free-tier rate limits.
     const recent = history.slice(-6).join('\n') || '(none yet)';
-    const warn = stuck
-      ? '\n⚠️ Your last action repeated with NO change to the page. Do NOT repeat it. ' +
-        'Pick a DIFFERENT element, scroll, or use "done" with the information already visible.\n'
+    const warn = lastDidNothing
+      ? '\n⚠️ Your last action did NOT change the page — it had no effect. Do something COMPLETELY DIFFERENT: ' +
+        'click a different element (e.g. a "Search", "Check", "Go" or results button), scroll, navigate to another URL, ' +
+        'or use "done" to report what you found. Do NOT repeat the same action.\n'
+      : '';
+    const deadList = deadDesc.size
+      ? `\nDO NOT choose these — they do NOTHING on this page:\n${[...deadDesc].map((d) => '- ' + d).join('\n')}\n`
       : '';
     const messages = [
       { role: 'system', content: SYSTEM_PROMPT },
@@ -243,19 +253,51 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
           `TASK: ${task}\n\n` +
           `STEPS SO FAR:\n${recent}\n` +
           warn +
+          deadList +
           `\nCURRENT PAGE (step ${step}):\n${view}\n\n` +
           `Respond with one action as JSON.`,
       },
     ];
 
-    emit({ kind: 'activity', step, phase: 'thinking', text: 'Thinking…' });
-    const raw = await chat({
-      baseUrl: cfg.baseUrl,
-      apiKey: cfg.apiKey,
-      model: cfg.model,
-      messages,
-      jsonMode: cfg.jsonMode,
-    });
+    // When stuck AND a vision model is available, SCREENSHOT the page and let
+    // the vision model pick the next move (it can see dropdowns/buttons the
+    // text list misses). Otherwise do the normal fast text step.
+    let raw;
+    if (lastDidNothing && cfg.vision) {
+      emit({ kind: 'activity', step, phase: 'thinking', text: '📸 Looking at the screenshot…' });
+      const shot = await annotatedScreenshot(page);
+      const visionMessages = [
+        { role: 'system', content: SYSTEM_PROMPT },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text:
+                `TASK: ${task}\n\nYour last action did nothing. LOOK at the screenshot and choose a DIFFERENT next action. ` +
+                `Orange numbered badges mark clickable elements; their numbers are the ids below.${deadList}\n\n` +
+                `ELEMENTS:\n${view}\n\nRespond with one action as JSON.`,
+            },
+            shot ? { type: 'image_url', image_url: { url: `data:image/jpeg;base64,${shot}` } } : { type: 'text', text: '(no screenshot)' },
+          ],
+        },
+      ];
+      try {
+        raw = await chat({ baseUrl: cfg.vision.baseUrl, apiKey: cfg.vision.apiKey, model: cfg.vision.model, messages: visionMessages, jsonMode: false });
+      } catch (e) {
+        emit({ kind: 'result', step, ok: false, text: `vision step failed: ${String(e.message).slice(0, 80)}` });
+      }
+    }
+    if (raw === undefined) {
+      emit({ kind: 'activity', step, phase: 'thinking', text: 'Thinking…' });
+      raw = await chat({
+        baseUrl: cfg.baseUrl,
+        apiKey: cfg.apiKey,
+        model: cfg.model,
+        messages,
+        jsonMode: cfg.jsonMode,
+      });
+    }
 
     let parsed;
     try {
@@ -284,8 +326,28 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
       }
     }
 
+    const sig = JSON.stringify(action);
+
+    // Hard block: if this exact action already proved to do nothing, refuse to
+    // run it again and force a different approach (prevents the stuck loop).
+    if (['click', 'type', 'navigate'].includes(action.type) && ineffective.has(sig)) {
+      skips += 1;
+      history.push(
+        `Step ${step}: "${describeAction(action)}" already had NO effect — skipped. Must try a different element/button or use done.`
+      );
+      emit({ kind: 'result', step, ok: false, text: 'that action does nothing here — trying a different approach' });
+      lastSig = sig;
+      lastDesc = describeAction(action);
+      if (skips >= 3) {
+        emit({ kind: 'result', step, ok: false, text: 'no approach is making progress — stopping' });
+        return "I couldn't make progress on this page — the control I needed didn't respond. Try giving me a direct Start URL for the exact page, or rephrase the task. (Note: app download counts are often only shown as ranges, or only to the app's owner.)";
+      }
+      continue;
+    }
+
     emit({ kind: 'activity', step, phase: 'acting', text: describeAction(action) });
-    executed.push(JSON.stringify(action));
+    executed.push(sig);
+    lastSig = sig;
     try {
       const result = await runAction(page, action);
       console.log(`  ✓ ${result}`);
@@ -298,5 +360,5 @@ export async function runAgent({ page, context, task, cfg, maxSteps = 25, confir
     }
   }
 
-  return `stopped after ${maxSteps} steps without an explicit done`;
+  return "I reached the step limit without finishing. Here's what I can suggest: give me a direct Start URL for the exact page, or rephrase the task into a smaller step.";
 }
