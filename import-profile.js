@@ -20,14 +20,21 @@ import path from 'node:path';
 const SRC = path.join(os.homedir(), 'Library/Application Support/Google/Chrome');
 const DST = path.resolve(process.env.AGENT_PROFILE_DIR || './.agent-profile');
 
-// 1. Chrome must be fully closed, or the copy can be corrupt / not logged in.
+// Chrome must normally be closed for a clean copy. With --live we copy anyway
+// (Chrome stays open) — useful for quick tests, but the snapshot can be slightly
+// stale and session cookies may be mid-write.
+const live = process.argv.includes('--live') || process.env.IMPORT_LIVE === '1';
+
 let running = '';
 try { running = execSync('pgrep -x "Google Chrome" || true').toString().trim(); } catch {}
-if (running) {
+if (running && !live) {
   console.error('\n⚠️  Google Chrome is still running.');
-  console.error('   Quit it completely (Cmd+Q, make sure no windows remain), then run this again.');
-  console.error('   A profile copied while Chrome is writing to it can be corrupt or logged out.\n');
+  console.error('   Quit it completely (Cmd+Q), then run this again — OR pass --live to copy while it stays open.');
+  console.error('   A profile copied while Chrome is writing to it can be stale or logged out.\n');
   process.exit(1);
+}
+if (running && live) {
+  console.warn('⚠️  --live: copying while Chrome is OPEN. The snapshot may be slightly stale.\n');
 }
 
 if (!existsSync(path.join(SRC, 'Default'))) {

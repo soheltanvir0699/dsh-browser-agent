@@ -32,7 +32,8 @@
   "scripts": {
     "start": "node index.js",
     "ui": "node server.js",
-    "import-profile": "node import-profile.js"
+    "import-profile": "node import-profile.js",
+    "import-profile:live": "node import-profile.js --live"
   },
   "license": "MIT",
   "dependencies": {
