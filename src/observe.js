@@ -44,12 +44,19 @@ const COLLECT = () => {
       .trim()
       .slice(0, 120);
 
+    // Real destination URL for links, so the model cites exact URLs (not guesses).
+    let url = '';
+    if (el.tagName === 'A' && el.href && /^https?:/i.test(el.href)) {
+      url = el.href.slice(0, 180);
+    }
+
     el.setAttribute('data-agent-id', String(id));
     out.push({
       id,
       tag: el.tagName.toLowerCase(),
       role: el.getAttribute('role') || el.getAttribute('type') || '',
       text: label,
+      url,
       vp: inViewport(el) ? 1 : 0,
     });
     id++;
@@ -116,7 +123,9 @@ export async function annotatedScreenshot(page) {
 
 export function renderObservation({ url, title, elements, text }) {
   const lines = elements.map(
-    (e) => `[${e.id}] <${e.tag}${e.role ? ` ${e.role}` : ''}>${e.vp ? '' : ' (scroll)'} ${e.text || '(no text)'}`
+    (e) =>
+      `[${e.id}] <${e.tag}${e.role ? ` ${e.role}` : ''}>${e.vp ? '' : ' (scroll)'} ${e.text || '(no text)'}` +
+      (e.url ? `  → ${e.url}` : '')
   );
   return (
     `URL: ${url}\nTITLE: ${title}\n\n` +

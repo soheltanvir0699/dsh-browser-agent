@@ -106,7 +106,8 @@ Writing the final answer (the "done" answer) — BE AS DETAILED AS POSSIBLE:
     • author/poster, date/time, category/tags, status
     • a 1-2 sentence description of what each item is about (from the title/snippet)
 - Prefer a Markdown TABLE with many columns (e.g. Rank | Title (linked) | Points | Comments | Author | Time | Source) and add a short notes list under it for extra context.
-- Use "## headings", "**bold**" labels, "- " bullets, and [text](url) links. Make titles clickable links to their URLs.
+- Use "## headings", "**bold**" labels, "- " bullets, and [text](url) links. Make titles clickable links.
+- LINKS MUST BE EXACT: only use a URL that is shown after "→" on that element in the CURRENT PAGE list. Copy it verbatim. NEVER guess, shorten, or build a URL from the title or domain — if an item has no "→ url", leave it as plain text (no link).
 - If the user asks for "details" and there are only a few items, you MAY open an item or its comments to add a short summary — but always include the on-page details first, and don't waste many steps.
 - Only include what you actually saw — never invent. If a detail wasn't available, omit it or say "n/a".`;
 
